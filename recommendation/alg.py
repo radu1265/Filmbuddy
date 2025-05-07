@@ -4,7 +4,7 @@ from surprise.model_selection import train_test_split
 from surprise.accuracy import rmse
 # import pandas as pd
 
-import dataLoader as dl
+from recommendation import dataLoader as dl
 
 def apply_svd():
 

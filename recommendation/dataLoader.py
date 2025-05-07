@@ -4,6 +4,7 @@ import os
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'MovieLens100K')
 
+
 # Load the MovieLens 100K dataset
 
 def load_dataset():
@@ -16,15 +17,15 @@ def load_movies():
     return df[['item_id', 'title']]
 
 
-def data_loader():
-    df = load_dataset()
-    movies = load_movies()
+def data_loader(self):
+    df = self.load_dataset()
+    movies = self.load_movies()
     df = pd.merge(df, movies, on='item_id')
     return df[['user_id', 'item_id', 'rating', 'title']]
 
 # preaper data for Surprise
 
-def data_for_surprise():
+def data_for_surprise(self):
     reader = Reader(rating_scale=(1, 5))
-    data = Dataset.load_from_df(load_dataset(), reader)
+    data = Dataset.load_from_df(self.load_dataset(), reader)
     return data
