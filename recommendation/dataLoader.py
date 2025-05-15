@@ -1,8 +1,8 @@
 # dataLoader.py
+import os
 
 import pandas as pd
 from surprise import Dataset, Reader
-import os
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'MovieLens100K')
 
@@ -23,9 +23,11 @@ def data_loader():
     df = df.drop(columns=['movie id'])
     return df[['user_id', 'item_id', 'rating', 'movie title']]
 
+# Needs improvement
 def data_for_surprise():
+    df = load_dataset()
     reader = Reader(rating_scale=(1, 5))
-    data = Dataset.load_from_df(data_loader(), reader)
+    data = Dataset.load_from_df(df, reader)
     return data
 
 if __name__ == "__main__":
