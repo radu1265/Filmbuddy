@@ -9,6 +9,7 @@ from recommendation import alg
 async def interpret_emotion(client: Client, user_text: str) -> float:
     prompt = (
         "You are an analysis assistant.\n"
+        "ALLWAYS RESPOND ONLY WITH A SINGLE FLOAT NUMBER BETWEEN 0.0 AND 1.0.\n"
         "Interpret the emotion in the following user input and respond with a single number \n"
         "between 0.0 (user wants simething new) and 1.0 (user wants things similar to what they allreay saw).\n"
         f"User input: \"{user_text}\""
@@ -18,9 +19,10 @@ async def interpret_emotion(client: Client, user_text: str) -> float:
         prompt=prompt
     )
     try:
-        alpha = float(response.get("completion", "0.5").strip())
+        alpha = float(response.get("response", "0.5").strip())
     except ValueError:
         alpha = 0.5
+        print("Invalid response, defaulting alpha to 0.5")
     return max(0.0, min(1.0, alpha))
 
 # Task 2: Generate output based on a predicted movie
