@@ -1,5 +1,10 @@
 # import interface.ollama_logic as ollama_logic
 from recommendation import alg
+from interface.ollama_logic import chat_loop
+from interface.ollama_server import OllamaServer
+from ollama import Client
+
+
 
 def check_user_id(user_id):
     """
@@ -81,14 +86,18 @@ def interface(user_id ,alpha):
 
 if __name__ == "__main__":
 
-    # add a warmup ollama call to ensure the model is loaded
-    
+    with OllamaServer(host="127.0.0.1:11435"):
+        client = Client(host="http://127.0.0.1:11435")
+        client.pull("llama3.1")
+        chat_loop(client)
+
+
     user_id = get_user()
     users_alpha = 0.7  # Set the alpha value for hybrid recommendations
-    print(f"Hello, user {user_id}! Let's get started with your movie recommendations.")
-    while True:
-        interface(user_id ,users_alpha)
-        choice = input("Do you want to continue? (yes/no): ").strip().lower()
-        if choice != 'yes':
-            print("Thank you for using FilmBuddy! Goodbye!")
-            break
+    # print(f"Hello, user {user_id}! Let's get started with your movie recommendations.")
+    # while True:
+    #     interface(user_id ,users_alpha)
+    #     choice = input("Do you want to continue? (yes/no): ").strip().lower()
+    #     if choice != 'yes':
+    #         print("Thank you for using FilmBuddy! Goodbye!")
+    #         break

@@ -44,17 +44,3 @@ def data_for_surprise():
     reader = Reader(rating_scale=(1, 5))
     data = Dataset.load_from_df(df, reader)
     return data
-
-if __name__ == "__main__":
-    load_movies_gener()
-    # test data_loader
-    # df = data_loader()
-    # print("Data loaded successfully")
-    # print("Number of users:", df['user_id'].nunique())
-    # print("Number of items:", df['item_id'].nunique())
-    # print("Number of ratings:", len(df))
-    # print("Sample data:\n", df.head())
-    # df = load_dataset()
-    # print (df.head())
-    # movies = load_movies()
-    # print (movies.head())
