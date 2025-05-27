@@ -6,12 +6,10 @@ from recommendation import alg
 
 # Task 1: Emotional interpretation to adjust alpha
 # Returns a float between 0.0 and 1.0
-async def interpret_emotion(client: Client, user_text: str) -> float:
+async def interpret_emotion(client: Client, user_text: str, alpha: float) -> float:
     prompt = (
         "You are an analysis assistant.\n"
-        "ALLWAYS RESPOND ONLY WITH A SINGLE FLOAT NUMBER BETWEEN 0.0 AND 1.0.\n"
-        "Interpret the emotion in the following user input and respond with a single number \n"
-        "between 0.0 (user wants simething new) and 1.0 (user wants things similar to what they allreay saw).\n"
+        "ALLWAYS RESPOND ONLY WITH A SINGLE FLOAT NUMBER BETWEEN 0.0 AND 1.0 FOR EMOTIONS, POSITIVE IS BIGGER.\n" \
         f"User input: \"{user_text}\""
     )
     response = client.generate(
@@ -19,8 +17,10 @@ async def interpret_emotion(client: Client, user_text: str) -> float:
         prompt=prompt
     )
     try:
+        print(response)
         alpha = float(response.get("response", "0.5").strip())
     except ValueError:
+        print(response)
         alpha = 0.5
         print("Invalid response, defaulting alpha to 0.5")
     return max(0.0, min(1.0, alpha))
@@ -70,7 +70,7 @@ def main():
         return
 
     # Initial alpha for hybrid recommendations
-    alpha = 0.7
+    alpha = 0.8
 
     # Step 2: Start Ollama server and client
     with OllamaServer(host="127.0.0.1:11435"):
@@ -87,8 +87,9 @@ def main():
             print("  4. Personalize experience (adjust alpha)")
             print("  5. Chat with assistant")
             print("  6. Change user ID")
-            print("  7. Exit")
-            choice = input("Enter choice (1-7): ").strip()
+            print("  7. Manually change similarity threshold (alpha)")
+            print("  8. Exit")
+            choice = input("Enter choice (1-8): ").strip()
 
             if choice == '1':
                 # Task 2a: single top movie
@@ -128,8 +129,11 @@ def main():
             elif choice == '4':
                 # Task 1: Emotional interpretation to adjust alpha
                 reaction = input("How do you feel about these recommendations? ").strip()
-                alpha = asyncio.run(interpret_emotion(client, reaction))
+                alpha_interpreted = asyncio.run(interpret_emotion(client, reaction, alpha))
+                alpha = (alpha_interpreted + alpha) / 2  # Adjust alpha based on user input
+                print(f"Interpreted alpha adjustment: {alpha_interpreted:.2f}")
                 print(f"Adjusted alpha: {alpha:.2f}")
+
 
             elif choice == '5':
                 # Task 3: free chat
@@ -151,13 +155,23 @@ def main():
                 if not check_user_id(user_id):
                     print("User ID out of range. Exiting.")
                     return
-
             elif choice == '7':
+                try:
+                    new_alpha = float(input("Enter new similarity threshold (alpha) between 0.0 and 1.0: ").strip())
+                    if 0.0 <= new_alpha <= 1.0:
+                        alpha = new_alpha
+                        print(f"Alpha set to {alpha:.2f}")
+                    else:
+                        print("Invalid alpha value. Please enter a number between 0.0 and 1.0.")
+                except ValueError:
+                    print("Invalid input. Please enter a valid float number.")
+
+            elif choice == '8':
                 print("Thank you for using FilmBuddy! Goodbye!")
                 break
 
             else:
-                print("Invalid choice. Please enter 1-7.")
+                print("Invalid choice. Please enter 1-8.")
 
 if __name__ == "__main__":
     main()

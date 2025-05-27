@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 
-def apply_svd_and_genre(alpha=0.7, test_size=0.2, random_state=42):
+def apply_svd_and_genre(test_size=0.2, random_state=42):
     # 1. Load and split the rating data
     data = dl.data_for_surprise()
     trainset, testset = train_test_split(data, test_size=test_size, random_state=random_state)
@@ -88,7 +88,7 @@ def recommend_top_n_movies(user_id, n, alpha):
     """
     Recommend top N movies for a given user using hybrid SVD and genre similarity.
     """
-    svd, trainset, testset, movies_df, genre_sim, movie_idx = apply_svd_and_genre(alpha=alpha)
+    svd, trainset, testset, movies_df, genre_sim, movie_idx = apply_svd_and_genre()
     recs_df = hybrid_recommendations(svd, trainset, movies_df, genre_sim, movie_idx,
                                      user_id=user_id, top_n=n, alpha=alpha)
     return recs_df
