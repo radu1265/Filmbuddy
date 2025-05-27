@@ -12,7 +12,6 @@ def apply_svd_and_genre(alpha=0.7, test_size=0.2, random_state=42):
     # 1. Load and split the rating data
     data = dl.data_for_surprise()
     trainset, testset = train_test_split(data, test_size=test_size, random_state=random_state)
-    print (trainset)
 
     # 2. Train SVD on the training set
     svd = SVD(random_state=random_state)

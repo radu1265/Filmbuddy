@@ -1,7 +1,7 @@
 import asyncio
 import os
 from ollama import Client
-from interface.ollama_server import OllamaServer
+from server.ollama_server import OllamaServer
 from recommendation import alg
 
 # Task 1: Emotional interpretation to adjust alpha
@@ -86,8 +86,9 @@ def main():
             print("  3. Talk about a specific movie")
             print("  4. Personalize experience (adjust alpha)")
             print("  5. Chat with assistant")
-            print("  6. Exit")
-            choice = input("Enter choice (1-6): ").strip()
+            print("  6. Change user ID")
+            print("  7. Exit")
+            choice = input("Enter choice (1-7): ").strip()
 
             if choice == '1':
                 # Task 2a: single top movie
@@ -140,13 +141,23 @@ def main():
                     history.append({"role": "user", "content": user_msg})
                     asyncio.run(chat_interaction(client, history))
                     history.append({"role": "assistant", "content": ""})
-
             elif choice == '6':
+                try:
+                    user_id_input = input("Please enter your user ID (1-1000): ")
+                    user_id = int(user_id_input)
+                except ValueError:
+                    print("Invalid user ID. Exiting.")
+                    return
+                if not check_user_id(user_id):
+                    print("User ID out of range. Exiting.")
+                    return
+
+            elif choice == '7':
                 print("Thank you for using FilmBuddy! Goodbye!")
                 break
 
             else:
-                print("Invalid choice. Please enter 1-6.")
+                print("Invalid choice. Please enter 1-7.")
 
 if __name__ == "__main__":
     main()
