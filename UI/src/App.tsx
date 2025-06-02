@@ -1,11 +1,11 @@
 import './App.css'
-import Chatbot from './components/Chatbot'
+import MainUI from './components/MainUI'
 
 function App() {
 
   return (
     <div>
-      <Chatbot />
+      <MainUI />
     </div>
   )
 }

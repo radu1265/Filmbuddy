@@ -1,177 +1,219 @@
+# filmbuddy_api.py
+
 import asyncio
-import os
+from typing import List, Dict, Any
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 from ollama import Client
 from server.ollama_server import OllamaServer
-from recommendation import alg
+from recommendation import alg  # your existing recommendation.alg module
 
-# Task 1: Emotional interpretation to adjust alpha
-# Returns a float between 0.0 and 1.0
-async def interpret_emotion(client: Client, user_text: str, alpha: float) -> float:
-    prompt = (
-        "You are an analysis assistant.\n"
-        "ALLWAYS RESPOND ONLY WITH A SINGLE FLOAT NUMBER BETWEEN 0.0 AND 1.0 FOR EMOTIONS, POSITIVE IS BIGGER.\n" \
-        f"User input: \"{user_text}\""
-    )
-    response = client.generate(
-        model="llama3.1",
-        prompt=prompt
-    )
-    try:
-        print(response)
-        alpha = float(response.get("response", "0.5").strip())
-    except ValueError:
-        print(response)
-        alpha = 0.5
-        print("Invalid response, defaulting alpha to 0.5")
-    return max(0.0, min(1.0, alpha))
+# Globals to hold the Ollama server context and client
+ollama_server: OllamaServer = None
+client: Client = None
 
-# Task 2: Generate output based on a predicted movie
-def movie_response(client: Client, movie: str) -> None:
-    messages = [
-        {"role": "system", "content": "You are a movie expert assistant."},
-        {"role": "user", "content": (
-            f"Based on my algorithm, the predicted movie is '{movie}'. "
-            "Provide a concise recommendation or fun fact about this movie."
-        )}
-    ]
-    print("Movie output:", end=" ", flush=True)
-    for chunk in client.chat(
-        model="llama3.1",
-        messages=messages,
-        stream=True
-    ):
-        # each chunk looks like {'message': {'role': 'assistant', 'content': '...'}}
-        print(chunk["message"]["content"], end="", flush=True)
-    print("\n")
 
-# Task 3: Standard chat interaction (streaming)
-async def chat_interaction(client: Client, history: list[dict]) -> None:
-    print("Assistant:", end=" ", flush=True)
-    for chunk in client.chat(model="llama3.1", messages=history, stream=True):
-        print(chunk["message"]["content"], end="", flush=True)
-    print("\n")
-
-# Utility: Validate user ID
 def check_user_id(user_id: int) -> bool:
     return isinstance(user_id, int) and 1 <= user_id <= 1000
 
-# Main application loop
-def main():
-    # Step 1: Ask for user ID
-    print("Welcome to FilmBuddy! Your personal movie recommendation assistant.")
+
+async def interpret_emotion(
+    client: Client, user_text: str, alpha: float
+) -> float:
+    """
+    Calls Ollama to interpret the user's emotion (0.0–1.0) and returns a float.
+    """
+    prompt = (
+        "You are an analysis assistant.\n"
+        "ALWAYS RESPOND ONLY WITH A SINGLE FLOAT NUMBER BETWEEN 0.0 AND 1.0 FOR EMOTIONS, POSITIVE IS BIGGER.\n"
+        f"User input: \"{user_text}\""
+    )
+    response = client.generate(model="llama3.1", prompt=prompt)
     try:
-        user_id_input = input("Please enter your user ID (1-1000): ")
-        user_id = int(user_id_input)
-    except ValueError:
-        print("Invalid user ID. Exiting.")
-        return
+        raw = response.get("response", "0.5").strip()
+        alpha_out = float(raw)
+    except (ValueError, AttributeError):
+        alpha_out = 0.5
+
+    # Clamp to [0.0, 1.0]
+    return max(0.0, min(1.0, alpha_out))
+
+
+def movie_response_str(client: Client, movie: str) -> str:
+    """
+    Uses Ollama chat (streaming) to get a short recommendation/fun fact about `movie`.
+    Returns the full concatenated string.
+    """
+    messages = [
+        {"role": "system", "content": "You are a movie expert assistant."},
+        {
+            "role": "user",
+            "content": (
+                f"Based on my algorithm, the predicted movie is '{movie}'. "
+                "Provide a concise recommendation or fun fact about this movie."
+            ),
+        },
+    ]
+
+    # stream=True returns an iterator of chunks; concatenate them
+    full = ""
+    for chunk in client.chat(model="llama3.1", messages=messages, stream=True):
+        full += chunk["message"]["content"]
+    return full.strip()
+
+
+async def chat_response(client: Client, history: List[Dict[str, str]]) -> str:
+    """
+    Uses Ollama chat (streaming) to reply given a Slack‐style `history` of messages.
+    Returns the full concatenated assistant reply.
+    """
+    full = ""
+    for chunk in client.chat(model="llama3.1", messages=history, stream=True):
+        full += chunk["message"]["content"]
+    return full.strip()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan handler to start and stop the Ollama server.
+    """
+    global ollama_server, client
+
+    # Startup logic
+    ollama_server = OllamaServer(host="127.0.0.1:11435")
+    ollama_server.__enter__()  # Start OllamaServer
+    client = Client(host="http://127.0.0.1:11435")
+    client.pull("llama3.1")  # Preload the model
+
+    yield  # Hand over control to FastAPI
+
+    # Shutdown logic
+    if ollama_server:
+        ollama_server.__exit__(None, None, None)
+
+
+app = FastAPI(lifespan=lifespan)
+
+# 1. Allow CORS from your Vite/React frontend (e.g. http://localhost:5173)
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",  # if you ever run a different dev port
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.post("/recommend/top")
+async def get_top_recommendation(data: Dict[str, Any]):
+    """
+    POST /recommend/top
+    Body JSON: { "user_id": int, "alpha": float }
+    Returns:
+      {
+        "title": "<movie title>",
+        "comment": "<Ollama-generated comment>"
+      }
+    """
+    user_id = data.get("user_id")
+    alpha = data.get("alpha")
+
     if not check_user_id(user_id):
-        print("User ID out of range. Exiting.")
-        return
+        raise HTTPException(status_code=400, detail="Invalid user_id (must be 1-1000).")
 
-    # Initial alpha for hybrid recommendations
-    alpha = 0.8
+    try:
+        alpha = float(alpha)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid alpha value.")
 
-    # Step 2: Start Ollama server and client
-    with OllamaServer(host="127.0.0.1:11435"):
-        client = Client(host="http://127.0.0.1:11435")
-        client.pull("llama3.1")
+    # Recommendation algorithm (returns a pandas DataFrame)
+    df = alg.recommend_top_n_movies(user_id, 1, alpha)
+    if df.empty:
+        raise HTTPException(status_code=404, detail="No recommendation found.")
+    title = df.iloc[0]["title"]
 
-        # Interactive menu
-        while True:
-            print(f"\nCurrent alpha: {alpha:.2f}")
-            print("Choose an action:")
-            print("  1. Get top movie recommendation")
-            print("  2. Get list of top-rated movies")
-            print("  3. Talk about a specific movie")
-            print("  4. Personalize experience (adjust alpha)")
-            print("  5. Chat with assistant")
-            print("  6. Change user ID")
-            print("  7. Manually change similarity threshold (alpha)")
-            print("  8. Exit")
-            choice = input("Enter choice (1-8): ").strip()
+    # Get Ollama comment
+    comment = movie_response_str(client, title)
 
-            if choice == '1':
-                # Task 2a: single top movie
-                print("Getting top movie recommendation...")
-                movie = alg.recommend_top_n_movies(user_id, 1, alpha)
-                title = movie['title'].values[0]
-                print(f"Recommended for you: {title}")
-                # Task 2b: Ollama comment on movie
-                movie_response(client, title)
-
-            elif choice == '2':
-                # Task 2: list top-rated movies
-                print("Getting top 5 movies...")
-                movies = alg.recommend_top_n_movies(user_id, 5, alpha)
-                for idx, row in movies.iterrows():
-                    print(f"{idx+1}. {row['title']} (Score: {row['hybrid_score']:.2f})")
-                print()
-
-            elif choice == '3':
-                # Task 3: Talk about specific movie
-                movie_name = input("Enter movie name: ").strip()
-                history = [
-                    {"role": "system", "content": "You are a movie expert assistant."},
-                    {"role": "user", "content": f"Let's talk about {movie_name}."}
-                ]
-                print(f"Entering discussion about '{movie_name}'. Type 'exit' or 'quit' to return to menu.")
-                while True:
-                    asyncio.run(chat_interaction(client, history))
-                    history.append({"role": "assistant", "content": ""})
-                    user_msg = input(f"You (about {movie_name}): ").strip()
-                    if user_msg.lower() in ("exit", "quit"):
-                        print(f"Exiting discussion about '{movie_name}'.\n")
-                        break
-                    history.append({"role": "user", "content": user_msg})
+    return {"title": title, "comment": comment}
 
 
-            elif choice == '4':
-                # Task 1: Emotional interpretation to adjust alpha
-                reaction = input("How do you feel about these recommendations? ").strip()
-                alpha_interpreted = asyncio.run(interpret_emotion(client, reaction, alpha))
-                alpha = (alpha_interpreted + alpha) / 2  # Adjust alpha based on user input
-                print(f"Interpreted alpha adjustment: {alpha_interpreted:.2f}")
-                print(f"Adjusted alpha: {alpha:.2f}")
+@app.post("/recommend/top_list")
+async def get_top_list(data: Dict[str, Any]):
+    """
+    POST /recommend/top_list
+    Body JSON: { "user_id": int, "alpha": float, "n": int (optional, default=5) }
+    Returns:
+      {
+        "movies": [
+          { "title": str, "hybrid_score": float, ... },
+          ...
+        ]
+      }
+    """
+    user_id = data.get("user_id")
+    alpha = data.get("alpha")
+    n = data.get("n", 5)
+
+    if not check_user_id(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id (must be 1-1000).")
+    try:
+        alpha = float(alpha)
+        n = int(n)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid alpha or n value.")
+
+    df = alg.recommend_top_n_movies(user_id, n, alpha)
+    # Convert DataFrame to list of dicts
+    records = df.to_dict(orient="records")
+    return {"movies": records}
 
 
-            elif choice == '5':
-                # Task 3: free chat
-                history = [{"role": "system", "content": "You are a helpful assistant."}]
-                while True:
-                    user_msg = input("You: ").strip()
-                    if user_msg.lower() in ("exit", "quit"):  # end chat sub-loop
-                        break
-                    history.append({"role": "user", "content": user_msg})
-                    asyncio.run(chat_interaction(client, history))
-                    history.append({"role": "assistant", "content": ""})
-            elif choice == '6':
-                try:
-                    user_id_input = input("Please enter your user ID (1-1000): ")
-                    user_id = int(user_id_input)
-                except ValueError:
-                    print("Invalid user ID. Exiting.")
-                    return
-                if not check_user_id(user_id):
-                    print("User ID out of range. Exiting.")
-                    return
-            elif choice == '7':
-                try:
-                    new_alpha = float(input("Enter new similarity threshold (alpha) between 0.0 and 1.0: ").strip())
-                    if 0.0 <= new_alpha <= 1.0:
-                        alpha = new_alpha
-                        print(f"Alpha set to {alpha:.2f}")
-                    else:
-                        print("Invalid alpha value. Please enter a number between 0.0 and 1.0.")
-                except ValueError:
-                    print("Invalid input. Please enter a valid float number.")
+@app.post("/emotion")
+async def adjust_alpha(data: Dict[str, Any]):
+    """
+    POST /emotion
+    Body JSON: { "user_text": str, "alpha": float }
+    Returns:
+      {
+        "alpha_interpreted": float,
+        "alpha_adjusted": float
+      }
+    """
+    user_text = data.get("user_text", "")
+    alpha = data.get("alpha")
 
-            elif choice == '8':
-                print("Thank you for using FilmBuddy! Goodbye!")
-                break
+    try:
+        alpha = float(alpha)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid alpha value.")
 
-            else:
-                print("Invalid choice. Please enter 1-8.")
+    interpreted = await interpret_emotion(client, user_text, alpha)
+    adjusted = (interpreted + alpha) / 2.0
 
-if __name__ == "__main__":
-    main()
+    return {"alpha_interpreted": interpreted, "alpha_adjusted": adjusted}
+
+
+@app.post("/chat")
+async def chat_endpoint(data: Dict[str, Any]):
+    """
+    POST /chat
+    Body JSON: { "history": [ { "role": "user"|"assistant"|"system", "content": str }, ... ] }
+    Returns:
+      { "reply": "<assistant-generated text>" }
+    """
+    history = data.get("history")
+    if not isinstance(history, list):
+        raise HTTPException(status_code=400, detail="`history` must be a list of messages.")
+
+    reply = await chat_response(client, history)
+    return {"reply": reply}

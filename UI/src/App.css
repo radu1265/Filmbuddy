@@ -1,41 +1,37 @@
-#root {
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* src/app.css */
+/* … other styles you already saw … */
+
+/* System bubble (initial prompt) */
+.system-bubble {
+  background: #e9ecef;
+  color: #495057;
+  align-self: center;
+  max-width: 80%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  font-style: italic;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* User message bubble */
+.user-bubble {
+  background: #0d6efd;
+  color: white;
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem 0.25rem 0 0.25rem;
+  word-wrap: break-word;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Bot message bubble */
+.bot-bubble {
+  background: #f1f3f5;
+  color: #212529;
+  align-self: flex-start;
+  max-width: 80%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem 0.25rem 0.25rem 0;
+  word-wrap: break-word;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
+/* … rest of your existing app.css … */
