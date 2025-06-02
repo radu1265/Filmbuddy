@@ -1,0 +1,178 @@
+/* app.css - Global styles for Chatbot Vite + React + Bootstrap project */
+
+/* Ensure full-height layout for the app container */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa; /* Light gray background */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Center the chatbot card vertically on taller screens */
+.container-fluid {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+/* Customize the chatbot card appearance */
+.card {
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+/* Header styling: adjust padding and align icon */
+.card-header {
+  padding: 0.75rem 1.25rem;
+}
+
+.card-header h5 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+/* Gear icon button styles */
+.btn-outline-light {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 1.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.btn-outline-light:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Dropdown menu adjustments */
+.dropdown-menu {
+  font-size: 0.9rem;
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dropdown-menu .dropdown-item {
+  padding: 0.5rem 1.25rem;
+}
+
+/* Chat area styling */
+.card-body {
+  background-color: #e9ecef;
+  padding: 1rem;
+  position: relative;
+}
+
+/* Message bubble styles */
+.message-bubble {
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  margin: 0.25rem 0;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+/* User message bubble overrides */
+.message-user {
+  background-color: #0d6efd; /* Bootstrap primary */
+  color: #ffffff;
+  border-bottom-right-radius: 0;
+}
+
+/* Bot message bubble overrides */
+.message-bot {
+  background-color: #ffffff;
+  color: #212529;
+  border-bottom-left-radius: 0;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+}
+
+/* Align user messages to right and bot to left */
+.message-container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.message-container.user {
+  justify-content: flex-end;
+}
+
+.message-container.bot {
+  justify-content: flex-start;
+}
+
+/* Scrollbar customization for chat body */
+.card-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.card-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+  background-color: #ced4da;
+  border-radius: 4px;
+  border: 2px solid #f1f1f1;
+}
+
+/* Input group styling */
+.card-footer {
+  padding: 0.5rem 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid #dee2e6;
+}
+
+.input-group .form-control {
+  border-radius: 0.5rem 0 0 0.5rem;
+  border: 1px solid #ced4da;
+  transition: border-color 0.2s ease;
+}
+
+.input-group .form-control:focus {
+  border-color: #0d6efd;
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.input-group .btn {
+  border-radius: 0 0.5rem 0.5rem 0;
+  border: 1px solid #0d6efd;
+  background-color: #0d6efd;
+  color: #ffffff;
+  transition: background-color 0.2s ease;
+}
+
+.input-group .btn:hover {
+  background-color: #0b5ed7;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 576px) {
+  .card {
+    width: 100% !important;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .container-fluid {
+    padding: 1rem;
+  }
+  .card-body {
+    padding: 0.5rem;
+  }
+  .input-group .form-control, .input-group .btn {
+    font-size: 0.9rem;
+  }
+}
