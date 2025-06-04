@@ -1,6 +1,5 @@
 // src/components/MainUI.tsx
 import React, { useState, useRef, useEffect } from 'react';
-// import { FaCog } from 'react-icons/fa';
 import { Chatbot } from './Chatbot';
 import '../app.css';
 import '../images/menu-button.png'
@@ -12,7 +11,7 @@ export const MainUI: React.FC = () => {
   const [userId, setUserId] = useState<number | null>(null);
   const [tempUserId, setTempUserId] = useState<string>('');
 
-  const [alpha, setAlpha] = useState<number>(0.8);
+  const [alpha, setAlpha] = useState<number>(0.9);
   const [selectedOption, setSelectedOption] = useState<MenuOption | null>(null);
 
   // Dropdown state
@@ -33,7 +32,7 @@ export const MainUI: React.FC = () => {
     if (selectedOption === 8) {
       setUserId(null);
       setTempUserId('');
-      setAlpha(0.8);
+      setAlpha(0.9);
       setSelectedOption(null);
     }
   }, [selectedOption]);

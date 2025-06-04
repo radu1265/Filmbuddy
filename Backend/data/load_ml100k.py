@@ -15,10 +15,10 @@ from dotenv import load_dotenv
 load_dotenv()
 # ────────────────────────────────────────────────────────────────────────────────
 # Adjust these two variables if your ML-100k folder is somewhere else:
-ML100K_DIR = os.path.expanduser("~/Downloads/ml-100k")
+ML100K_DIR = os.path.join(os.path.dirname(__file__), "MovieLens100K")
 DB_NAME    = "movielens"
-DB_USER    = "movies_user"
-DB_PASS    = os.getenv("PASSWORD")       # ← replace with whatever password you chose
+DB_USER    = "postgres"
+DB_PASS    = os.getenv("PASSWORD")
 DB_HOST    = "localhost"
 DB_PORT    = 5432
 # ────────────────────────────────────────────────────────────────────────────────
@@ -189,5 +189,4 @@ def main():
         conn.close()
 
 if __name__ == "__main__":
-    # main()
-    print(DB_PASS)
+    main()

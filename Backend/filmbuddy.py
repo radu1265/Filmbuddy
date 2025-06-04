@@ -1,5 +1,3 @@
-# filmbuddy_api.py
-
 import asyncio
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
