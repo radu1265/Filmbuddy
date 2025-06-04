@@ -1,229 +1,61 @@
 // src/components/MainUI.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';
-import '../images/menu-button.png'
 
-type MenuOption = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type MainUIProps = {
+  userId: number;
+  alpha: number;
+  setUserId: (id: number) => void;
+  setAlpha: (a: number) => void;
+  selectedOption: number | null;
+  setSelectedOption: (opt: number | null) => void;
+};
 
-export const MainUI: React.FC = () => {
-  // userId is null until the user types it in the initial prompt
-  const [userId, setUserId] = useState<number | null>(null);
-  const [tempUserId, setTempUserId] = useState<string>('');
-
-  const [alpha, setAlpha] = useState<number>(0.9);
-  const [selectedOption, setSelectedOption] = useState<MenuOption | null>(null);
-
-  // Dropdown state
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Handle the “Exit” option: reset everything
-  useEffect(() => {
-    if (selectedOption === 8) {
-      setUserId(null);
-      setTempUserId('');
-      setAlpha(0.9);
-      setSelectedOption(null);
-    }
-  }, [selectedOption]);
-
-  // If userId is still null, render an initial prompt
-  if (userId === null) {
-    return (
-      <div className="userid-prompt-container">
-        <div className="userid-prompt-box">
-          <h3 className="mb-3">Welcome to FilmBuddy</h3>
-          <label htmlFor="userid-input" className="form-label">
-            Please enter your User ID (1 – 1000):
-          </label>
-          <input
-            id="userid-input"
-            type="number"
-            className="form-control mb-3"
-            min={1}
-            max={1000}
-            value={tempUserId}
-            onChange={(e) => setTempUserId(e.target.value)}
-            placeholder="e.g. 42"
-            
-          />
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              const parsed = parseInt(tempUserId || '', 10);
-              if (!isNaN(parsed) && parsed >= 1 && parsed <= 1000) {
-                setUserId(parsed);
-              } else {
-                alert('Enter a valid integer between 1 and 1000.');
-              }
-            }}
-          >
-            Submit
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Once userId is set, show the main menu + content
+const MainUI: React.FC<MainUIProps> = ({
+  userId,
+  alpha,
+  setUserId,
+  setAlpha,
+  selectedOption,
+  setSelectedOption,
+}) => {
   return (
-    <div className="mainui-container d-flex flex-column">
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center px-4 py-2 header-bar">
-        <div className="dropdown" ref={dropdownRef}>
-          <button
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => setDropdownOpen((p) => !p)}
-            aria-expanded={dropdownOpen}
-          >
-            <img src="src/images/menu-button.png" alt="Menu" style={{ width: '24px', height: '24px' }} />
-          </button>
-          {dropdownOpen && (
-            <ul className="dropdown-menu dropdown-menu-end show">
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(1);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  1. Top movie recommendation
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(2);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  2. Top-rated movies list
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(3);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  3. Talk about specific movie
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(4);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  4. Personalize (adjust alpha)
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(5);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  5. Chat with assistant
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(6);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  6. Change user ID
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    setSelectedOption(7);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  7. Manually change alpha
-                </button>
-              </li>
-              <li><hr className="dropdown-divider" /></li>
-              <li>
-                <button
-                  className="dropdown-item text-danger"
-                  onClick={() => {
-                    setSelectedOption(8);
-                    setDropdownOpen(false);
-                  }}
-                >
-                  8. Exit
-                </button>
-              </li>
-            </ul>
-          )}
+    <div className="flex-grow-1 overflow-auto content-area px-4 py-3">
+      {!selectedOption && (
+        <div className="alert alert-secondary text-center">
+          Choose an option from the <strong>Menu</strong> above to begin.
         </div>
-        <div>
-          <span className="me-3"><strong>User ID:</strong> {userId}</span>
-          <span><strong>Alpha:</strong> {alpha.toFixed(2)}</span>
+      )}
+
+      {selectedOption === 1 && <TopMovie userId={userId} alpha={alpha} />}
+      {selectedOption === 2 && <TopList userId={userId} alpha={alpha} />}
+      {selectedOption === 3 && <TalkSpecificMovie />}
+      {selectedOption === 4 && <AdjustEmotion alpha={alpha} setAlpha={setAlpha} />}
+      {selectedOption === 5 && <Chatbot />}
+      {selectedOption === 6 && <ChangeUserId setUserId={setUserId} />}
+      {selectedOption === 7 && <ManualAlpha alpha={alpha} setAlpha={setAlpha} />}
+      {selectedOption === 8 && (
+        <div className="alert alert-warning text-center">
+          All state has been reset. The app will now ask for a new User ID.
         </div>
-      </div>
-
-      {/* Content area: grows to fill all remaining height */}
-      <div className="flex-grow-1 overflow-auto content-area px-4 py-3">
-        {!selectedOption && (
-          <div className="alert alert-secondary text-center">
-            Choose an option from the <strong>Menu</strong> above to begin.
-          </div>
-        )}
-
-        {selectedOption === 1 && <TopMovie userId={userId} alpha={alpha} />}
-        {selectedOption === 2 && <TopList userId={userId} alpha={alpha} />}
-        {selectedOption === 3 && <TalkSpecificMovie />}
-        {selectedOption === 4 && <AdjustEmotion alpha={alpha} setAlpha={setAlpha} />}
-        {selectedOption === 5 && <Chatbot />}
-        {selectedOption === 6 && <ChangeUserId setUserId={setUserId} />}
-        {selectedOption === 7 && <ManualAlpha alpha={alpha} setAlpha={setAlpha} />}
-        {selectedOption === 8 && (
-          <div className="alert alert-warning text-center">
-            All state has been reset. The app will now ask for a new User ID.
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
 
+export default MainUI;
 
-
-
-/* Sub-components below: */
+/* ————————————————
+   Sub‐components (same as before, just copied in)
+   ———————————————— */
 
 const TopMovie: React.FC<{
   userId: number;
   alpha: number;
 }> = ({ userId, alpha }) => {
-  const [result, setResult] = useState<{ title: string; comment: string } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [result, setResult] = React.useState<{ title: string; comment: string } | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
   const fetchTop = async () => {
     setLoading(true);
@@ -270,9 +102,11 @@ const TopList: React.FC<{
   userId: number;
   alpha: number;
 }> = ({ userId, alpha }) => {
-  const [n, setN] = useState(5);
-  const [results, setResults] = useState<Array<{ title: string; hybrid_score: number }>>([]);
-  const [loading, setLoading] = useState(false);
+  const [n, setN] = React.useState(5);
+  const [results, setResults] = React.useState<
+    Array<{ title: string; hybrid_score: number }>
+  >([]);
+  const [loading, setLoading] = React.useState(false);
 
   const fetchList = async () => {
     setLoading(true);
@@ -331,9 +165,11 @@ const TopList: React.FC<{
 };
 
 const TalkSpecificMovie: React.FC = () => {
-  const [movieName, setMovieName] = useState('');
-  const [history, setHistory] = useState<Array<{ role: string; content: string }>>([]);
-  const [chatting, setChatting] = useState(false);
+  const [movieName, setMovieName] = React.useState('');
+  const [history, setHistory] = React.useState<
+    Array<{ role: string; content: string }>
+  >([]);
+  const [chatting, setChatting] = React.useState(false);
 
   const startDiscussion = () => {
     if (!movieName.trim()) return;
@@ -410,7 +246,7 @@ const TalkSpecificMovie: React.FC = () => {
 };
 
 const MovieChatInput: React.FC<{ onSend: (msg: string) => void }> = ({ onSend }) => {
-  const [text, setText] = useState('');
+  const [text, setText] = React.useState('');
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -445,13 +281,16 @@ const MovieChatInput: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
   );
 };
 
-const AdjustEmotion: React.FC<{ alpha: number; setAlpha: (a: number) => void }> = ({
-  alpha,
-  setAlpha,
-}) => {
-  const [feedback, setFeedback] = useState('');
-  const [result, setResult] = useState<{ interpreted: number; adjusted: number } | null>(null);
-  const [loading, setLoading] = useState(false);
+const AdjustEmotion: React.FC<{
+  alpha: number;
+  setAlpha: (a: number) => void;
+}> = ({ alpha, setAlpha }) => {
+  const [feedback, setFeedback] = React.useState('');
+  const [result, setResult] = React.useState<{
+    interpreted: number;
+    adjusted: number;
+  } | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
   const submitEmotion = async () => {
     if (!feedback.trim()) return;
@@ -464,7 +303,10 @@ const AdjustEmotion: React.FC<{ alpha: number; setAlpha: (a: number) => void }> 
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      setResult({ interpreted: data.alpha_interpreted, adjusted: data.alpha_adjusted });
+      setResult({
+        interpreted: data.alpha_interpreted,
+        adjusted: data.alpha_adjusted,
+      });
       setAlpha(data.alpha_adjusted);
     } catch {
       // ignore
@@ -503,12 +345,12 @@ const AdjustEmotion: React.FC<{ alpha: number; setAlpha: (a: number) => void }> 
 };
 
 const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId }) => {
-  const [temp, setTemp] = useState('');
+  const [temp, setTemp] = React.useState('');
   return (
     <div className="pane-container">
       <h5>6. Change user ID</h5>
       <div className="mb-3">
-        <label className="form-label">New User ID (1–1000):</label>
+        <label className="form-label">New User ID (1 – 1000):</label>
         <input
           type="number"
           className="form-control"
@@ -525,6 +367,8 @@ const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId
           if (parsed >= 1 && parsed <= 1000) {
             setUserId(parsed);
             setTemp('');
+            // Optionally reset selectedOption so the user sees the menu again:
+            // setSelectedOption(null);
           } else {
             alert('Enter a valid ID between 1 and 1000.');
           }
@@ -536,16 +380,16 @@ const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId
   );
 };
 
-const ManualAlpha: React.FC<{ alpha: number; setAlpha: (a: number) => void }> = ({
-  alpha,
-  setAlpha,
-}) => {
-  const [temp, setTemp] = useState(alpha.toString());
+const ManualAlpha: React.FC<{
+  alpha: number;
+  setAlpha: (a: number) => void;
+}> = ({ alpha, setAlpha }) => {
+  const [temp, setTemp] = React.useState(alpha.toString());
   return (
     <div className="pane-container">
       <h5>7. Manually change similarity threshold (alpha)</h5>
       <div className="mb-3">
-        <label className="form-label">New alpha (0.0–1.0):</label>
+        <label className="form-label">New alpha (0.0 – 1.0):</label>
         <input
           type="number"
           step="0.01"
@@ -573,5 +417,3 @@ const ManualAlpha: React.FC<{ alpha: number; setAlpha: (a: number) => void }> = 
     </div>
   );
 };
-
-export default MainUI;
