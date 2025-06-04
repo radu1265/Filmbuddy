@@ -1,5 +1,6 @@
 // src/components/AuthPage.tsx
 import React, { useState } from 'react';
+import CreateAccount from './CreateAccount';
 
 type AuthPageProps = {
   // After successful “login,” we call setUserId with a numeric ID.
@@ -7,12 +8,31 @@ type AuthPageProps = {
 };
 
 const AuthPage: React.FC<AuthPageProps> = ({ setUserId }) => {
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  // State for login form
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  // Handler when registration completes (we receive a newUserId)
+  const handleSuccessfulRegistration = (newUserId: number) => {
+    // You might want to auto-login them here, or just switch back to login screen.
+    // For now, let’s just pass the ID upward and stay on login:
+    setUserId(newUserId);
+  };
+
+  // Toggle between login vs registration
+  const toggleMode = () => {
+    setIsRegistering((prev) => !prev);
+    // Clear login fields when switching
+    setUsername('');
+    setPassword('');
+  };
+
+  // ------------ LOGIN FORM HANDLER ----------------
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: replace this placeholder logic with real authentication.
+    // TODO: replace this placeholder logic with real authentication (e.g. fetch to /users/login).
     if (username.trim() && password.trim()) {
       // For now, we simply assign a dummy user ID (e.g. 1).
       setUserId(1);
@@ -21,6 +41,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId }) => {
     }
   };
 
+  // ------------ RENDER ----------------
+  if (isRegistering) {
+    return (
+      <CreateAccount
+        onRegistered={handleSuccessfulRegistration}
+        onCancel={toggleMode}
+      />
+    );
+  }
+
+  // Otherwise, render LOGIN form
   return (
     <div className="d-flex justify-content-center align-items-center vh-100">
       <div className="card shadow-sm" style={{ width: '100%', maxWidth: '600px' }}>
@@ -53,10 +84,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId }) => {
                 placeholder="Enter your password"
               />
             </div>
-            <button type="submit" className="btn btn-primary w-100">
+            <button type="submit" className="btn btn-primary w-100 mb-2">
               Login
             </button>
           </form>
+          <hr />
+          <button
+            className="btn btn-link w-100"
+            onClick={toggleMode}
+          >
+            Create a new account
+          </button>
         </div>
       </div>
     </div>
