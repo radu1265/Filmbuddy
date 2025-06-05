@@ -1,17 +1,19 @@
-# user_utils.py
+from dotenv import load_dotenv
 
+import os
 import psycopg2
 import bcrypt
+
+load_dotenv()  # Load environment variables from .env file
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Database connection parameters (make sure these match what you used in alg.py)
 DB_NAME = "movielens"
-DB_USER = "movies_user"
-DB_PASS = "mypassword"   # ← your actual password
+DB_USER = "postgres"
+DB_PASS = os.getenv("PASSWORD")
 DB_HOST = "localhost"
 DB_PORT = 5432
 # ────────────────────────────────────────────────────────────────────────────────
-
 def get_db_connection():
     return psycopg2.connect(
         dbname=DB_NAME,
@@ -52,8 +54,8 @@ def add_new_user(age: int, gender: str, occupation: str, zip_code: str, raw_pass
 
 def check_user_credentials(user_id: int, raw_password: str) -> bool:
     """
-    Returns True if user_id exists and raw_password matches the stored bcrypt hash.
-    Otherwise returns False.
+    Verifies whether a given user_id exists and whether the provided raw_password
+    matches the stored bcrypt hash. Returns True if credentials are valid, False otherwise.
     """
     conn = get_db_connection()
     cur = conn.cursor()
@@ -63,10 +65,37 @@ def check_user_credentials(user_id: int, raw_password: str) -> bool:
     conn.close()
 
     if row is None:
+        print(f"[login] User ID {user_id} does not exist.")
         return False
 
-    stored_hash = row[0]   # bcrypt hash stored as BYTEA
-    return bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash)
+    stored_hash = row[0]
+    if stored_hash is None:
+        print(f"[login] No password set for user ID {user_id}.")
+        return False
+
+    # Debug logging
+    print(f"[login] raw_password (str): {raw_password!r}")
+    print(f"[login] stored_hash raw type: {type(stored_hash)}, repr: {stored_hash!r}")
+
+    # Convert memoryview (or other buffer) to bytes
+    if isinstance(stored_hash, memoryview):
+        print("[login] Converting stored_hash from memoryview to bytes")
+        stored_hash = bytes(stored_hash)
+    elif isinstance(stored_hash, str):
+        # If you ever stored it as TEXT, convert that string to bytes
+        print("[login] Converting stored_hash from str to bytes")
+        stored_hash = stored_hash.encode("utf-8")
+    # If it's already bytes, do nothing
+
+    try:
+        ok = bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash)
+        print(f"[login] bcrypt.checkpw returned: {ok}")
+        return ok
+    except Exception as ex:
+        print(f"[login] Exception in bcrypt.checkpw: {ex}")
+        return False
+
+
 
 
 def user_exists(user_id: int) -> bool:

@@ -1,4 +1,3 @@
-// src/components/MainUI.tsx
 import React from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';

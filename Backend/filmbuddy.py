@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ollama import Client
 from server.ollama_server import OllamaServer
 from recommendation import alg  # your existing recommendation.alg module
+from user_utils import get_db_connection
 
 from user_utils import (
     add_new_user,
@@ -233,19 +235,14 @@ async def chat_endpoint(data: Dict[str, Any]):
 
 @app.post("/users/register")
 async def register_user(data: Dict[str, Any]):
-    """
-    POST /users/register
-    Body JSON: { "age": int, "gender": "M"|"F", "occupation": str, "zip_code": str, "password": str }
-    Returns:
-      { "user_id": int }
-    """
+    print(f"Registering user with data: {data}")
     age = data.get("age")
     gender = data.get("gender", "").upper()
     occupation = data.get("occupation", "")
     zip_code = data.get("zip_code", "")
     raw_password = data.get("password", "")
 
-    # Basic validation
+    # Basic validation (unchanged)…
     if not isinstance(age, int) or age <= 0:
         raise HTTPException(status_code=400, detail="Invalid age.")
     if gender not in ("M", "F"):
@@ -260,6 +257,8 @@ async def register_user(data: Dict[str, Any]):
     try:
         new_id = add_new_user(age, gender, occupation, zip_code, raw_password)
     except Exception as e:
+        # Print full traceback so we can see exactly where it failed
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Could not create user: {e}")
 
     return {"user_id": new_id}
@@ -273,17 +272,50 @@ async def login_user(data: Dict[str, Any]):
     Returns:
       { "success": bool }
     """
-    user_id = data.get("user_id")
+    raw_id = data.get("user_id")
     raw_password = data.get("password", "")
+    print(f"Login attempt with user_id={raw_id}, password={raw_password}")
 
-    if not isinstance(user_id, int) or user_id <= 0:
+    # 1) Coerce user_id into an integer (or return 400 if invalid)
+    try:
+        user_id = int(raw_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="user_id must be an integer")
+
+    # 2) Must be positive
+    if user_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid user_id.")
-    if not isinstance(raw_password, str) or not raw_password:
-        raise HTTPException(status_code=400, detail="Invalid password.")
 
+    # 3) Check that the user exists
     if not user_exists(user_id):
         raise HTTPException(status_code=404, detail="User not found.")
 
+    # 4) Fetch is_dummy flag for this user_id
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT is_dummy FROM users WHERE user_id = %s;", (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if row is None:
+        # Somehow the user disappeared between steps
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    is_dummy = row[0]  # True or False
+
+    # 5) If this is a dummy user, accept only "admin" as the password
+    if is_dummy:
+        if raw_password == "admin":
+            return {"success": True}
+        else:
+            raise HTTPException(status_code=401, detail="Incorrect password for dummy account.")
+
+    # 6) For non-dummy users, enforce that password is a nonempty string
+    if not isinstance(raw_password, str) or len(raw_password) < 4:
+        raise HTTPException(status_code=400, detail="Invalid password.")
+
+    # 7) Now check the actual bcrypt hash for real users
     if not check_user_credentials(user_id, raw_password):
         raise HTTPException(status_code=401, detail="Incorrect password.")
 

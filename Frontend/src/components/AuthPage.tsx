@@ -30,16 +30,60 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId }) => {
   };
 
   // ------------ LOGIN FORM HANDLER ----------------
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: replace this placeholder logic with real authentication (e.g. fetch to /users/login).
-    if (username.trim() && password.trim()) {
-      // For now, we simply assign a dummy user ID (e.g. 1).
-      setUserId(1);
-    } else {
-      alert('Please enter both username and password.');
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  // 1) Validate that "username" is a nonempty numeric string
+  const trimmedUsername = username.trim();
+  if (!trimmedUsername) {
+    alert("Please enter your user ID.");
+    return;
+  }
+  const numericId = Number(trimmedUsername);
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    alert("User ID must be a positive integer.");
+    return;
+  }
+
+  // 2) Validate password length
+  if (password.length < 4) {
+    alert("Password must be at least 4 characters.");
+    return;
+  }
+
+  // 3) Build payload and send request
+  const payload = { user_id: numericId, password };
+  try {
+    const resp = await fetch('/api/users/login', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    console.log("Login request sent:", payload);
+    console.log("Response status:", resp.status);
+
+    if (!resp.ok) {
+      // Attempt to read JSON error detail from backend
+      let detail = "Login failed. Please try again.";
+      try {
+        const errJson = await resp.json();
+        if (errJson.detail) detail = errJson.detail;
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(detail);
     }
-  };
+
+    const data = await resp.json();
+    console.log("Login successful:", data);
+
+    setUserId(numericId); // Pass the user ID to parent component
+  } catch (err: any) {
+    console.error("Login error:", err);
+    alert(err.message || "Login failed. Please try again.");
+  }
+};
 
   // ------------ RENDER ----------------
   if (isRegistering) {

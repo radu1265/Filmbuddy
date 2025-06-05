@@ -1,6 +1,7 @@
 // src/components/CreateAccount.tsx
 import React, { useState } from 'react';
 
+
 type CreateAccountProps = {
   onRegistered: (newUserId: number) => void;
   onCancel: () => void;
@@ -27,27 +28,25 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
       setError("Please fill in all fields (password ≥ 4 chars).");
       return;
     }
+    // Register the user
+    try {
+      const resp = await fetch('http://localhost:5000/users/register', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ age, gender, occupation, zip_code: zipCode, password }),
+      });
+      if (!resp.ok) throw new Error("Registration failed");
+      const data = await resp.json();
+      const newId = data.user_id; 
+      console.log("New user registered with ID:", data);
+      onRegistered(newId);
+    } catch (err: any) {
+      setError(err.message || "Registration error");
+    }
 
-    // TODO: Replace with real fetch to your /users/register endpoint
-    // For example:
-    //
-    // try {
-    //   const resp = await fetch("http://localhost:8000/users/register", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({ age, gender, occupation, zip_code: zipCode, password }),
-    //   });
-    //   if (!resp.ok) throw new Error("Registration failed");
-    //   const data = await resp.json();
-    //   const newId = data.user_id; 
-    //   onRegistered(newId);
-    // } catch (err: any) {
-    //   setError(err.message || "Registration error");
-    // }
-
-    // For now, just simulate success with a dummy ID:
-    const newId = Math.floor(Math.random() * 10000) + 1000;
-    onRegistered(newId);
+    // // For now, just simulate success with a dummy ID:
+    // const newId = Math.floor(Math.random() * 10000) + 1000;
+    // onRegistered(newId);
   };
 
   return (
