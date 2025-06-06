@@ -312,7 +312,7 @@ async def login_user(data: Dict[str, Any]):
     POST /users/login
     Body JSON: { "username": str, "password": str }
     Returns:
-      { "user_id": int, "success": bool }
+      { "user_id": int, "alpha": float, "success": bool }
     """
     username = data.get("username", "").strip()
     raw_password = data.get("password", "")
@@ -321,15 +321,15 @@ async def login_user(data: Dict[str, Any]):
         raise HTTPException(status_code=400, detail="Username required.")
     if not isinstance(raw_password, str) or not raw_password:
         raise HTTPException(status_code=400, detail="Password required.")
-    
-    # debug
-    print(f"Login attempt for user: {username}")
 
-    # 1) Look up the row by username, retrieve user_id, is_dummy, and password_hash
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT user_id, is_dummy, password_hash FROM users WHERE username = %s;",
+        """
+        SELECT user_id, is_dummy, password_hash, alpha
+          FROM users
+         WHERE username = %s;
+        """,
         (username,)
     )
     row = cur.fetchone()
@@ -339,27 +339,53 @@ async def login_user(data: Dict[str, Any]):
     if row is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    user_id, is_dummy, stored_hash = row
+    user_id, is_dummy, stored_hash, stored_alpha = row
 
-    # 2) If dummy account, accept only "admin"
+    # If it’s a dummy account, accept only “admin”
     if is_dummy:
         if raw_password == "admin":
-            return {"user_id": user_id, "success": True}
+            return {"user_id": user_id, "alpha": stored_alpha, "success": True}
         else:
             raise HTTPException(status_code=401, detail="Incorrect password for dummy.")
 
-    # 3) Real user → check that stored_hash is not None, then bcrypt
+    # Real user — verify stored_hash
     if stored_hash is None:
         raise HTTPException(status_code=500, detail="No password set for this user.")
-
-    # Convert memoryview to bytes if necessary
     if isinstance(stored_hash, memoryview):
         stored_hash = bytes(stored_hash)
 
     if not bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash):
         raise HTTPException(status_code=401, detail="Incorrect password.")
 
-    return {"user_id": user_id, "success": True}
+    # Return the stored alpha along with user_id
+    return {"user_id": user_id, "alpha": stored_alpha, "success": True}
+
+@app.put("/users/{user_id}/alpha")
+async def update_user_alpha(user_id: int, data: Dict[str, Any]):
+    """
+    PUT /users/{user_id}/alpha
+    Body JSON: { "alpha": float }
+    Returns: { "alpha": float }
+    """
+    new_alpha = data.get("alpha")
+    if not isinstance(new_alpha, (float, int)) or not (0.0 <= float(new_alpha) <= 1.0):
+        raise HTTPException(status_code=400, detail="Alpha must be a number between 0.0 and 1.0.")
+
+    # Verify user exists
+    if not user_exists(user_id):
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Update in database
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET alpha = %s WHERE user_id = %s;",
+        (new_alpha, user_id)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"alpha": new_alpha}
 
 
 @app.get("/movies")

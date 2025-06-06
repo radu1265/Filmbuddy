@@ -3,50 +3,44 @@ import React, { useState } from 'react';
 import CreateAccount from './CreateAccount';
 
 type AuthPageProps = {
-  // After successful “login,” we call setUserId with a numeric ID,
-  // and setUsername with the string username.
   setUserId: (id: number) => void;
   setUsername: (name: string) => void;
+  setAlpha: (a: number) => void;
+  onLoginComplete: (userId: number) => void;
 };
 
-const AuthPage: React.FC<AuthPageProps> = ({ setUserId, setUsername }) => {
+const AuthPage: React.FC<AuthPageProps> = ({
+  setUserId,
+  setUsername,
+  setAlpha,
+  onLoginComplete,
+}) => {
   const [isRegistering, setIsRegistering] = useState(false);
-
-  // State for login form
-  const [username, setUsernameInput] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [password, setPassword] = useState('');
 
-  // Handler when registration completes (we receive a newUserId)
   const handleSuccessfulRegistration = (newUserId: number) => {
     setUserId(newUserId);
-    // Optionally setUsername here if CreateAccount returns the username
   };
 
-  // Toggle between login vs registration
   const toggleMode = () => {
     setIsRegistering((prev) => !prev);
     setUsernameInput('');
     setPassword('');
   };
 
-  // ------------ LOGIN FORM HANDLER ----------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // 1) Validate that "username" is nonempty
-    const trimmedUsername = username.trim();
+    const trimmedUsername = usernameInput.trim();
     if (!trimmedUsername) {
       alert('Please enter your username.');
       return;
     }
-
-    // 2) Validate password length
     if (password.length < 4) {
       alert('Password must be at least 4 characters.');
       return;
     }
 
-    // 3) Build payload and send request
     const payload = { username: trimmedUsername, password };
     try {
       const resp = await fetch('/api/users/login', {
@@ -55,36 +49,34 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId, setUsername }) => {
         body: JSON.stringify(payload),
       });
 
-      console.log('Login request sent:', payload);
-      console.log('Response status:', resp.status);
-
       if (!resp.ok) {
         let detail = 'Login failed. Please try again.';
         try {
           const errJson = await resp.json();
           if (errJson.detail) detail = errJson.detail;
-        } catch {
-          // ignore parse errors
-        }
+        } catch {}
         throw new Error(detail);
       }
 
       const data = await resp.json();
-      console.log('Login successful:', data);
-
-      // 4) Extract numeric user_id from response and store both ID and username
-      if (typeof data.user_id !== 'number') {
+      // Expecting { user_id: number, alpha: number, success: true }
+      if (
+        typeof data.user_id !== 'number' ||
+        typeof data.alpha !== 'number'
+      ) {
         throw new Error('Invalid response from server.');
       }
+
       setUserId(data.user_id);
       setUsername(trimmedUsername);
+      setAlpha(data.alpha);
+      onLoginComplete(data.user_id);
     } catch (err: any) {
       console.error('Login error:', err);
       alert(err.message || 'Login failed. Please try again.');
     }
   };
 
-  // ------------ RENDER ----------------
   if (isRegistering) {
     return (
       <CreateAccount
@@ -94,7 +86,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId, setUsername }) => {
     );
   }
 
-  // Otherwise, render LOGIN form
   return (
     <div className="d-flex justify-content-center align-items-center vh-100">
       <div className="card shadow-sm" style={{ width: '100%', maxWidth: '600px' }}>
@@ -109,7 +100,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ setUserId, setUsername }) => {
                 id="username-input"
                 type="text"
                 className="form-control"
-                value={username}
+                value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
                 placeholder="Enter your username"
               />

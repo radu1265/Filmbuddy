@@ -3,6 +3,7 @@ import React from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';
 import RateMovie from './RateMovie';
+import ManualAlpha from './ManualAlpha';
 
 type MainUIProps = {
   userId: number;
@@ -58,7 +59,9 @@ const MainUI: React.FC<MainUIProps> = ({
       {selectedOption === 3 && <TalkSpecificMovie />}
 
       {/* 4. Personalize (adjust alpha) */}
-      {selectedOption === 4 && <AdjustEmotion alpha={alpha} setAlpha={setAlpha} />}
+      {selectedOption === 4 && (
+        <AdjustEmotion userId={userId} alpha={alpha} setAlpha={setAlpha} />
+      )}
 
       {/* 5. Chat with assistant */}
       {selectedOption === 5 && <Chatbot />}
@@ -66,8 +69,10 @@ const MainUI: React.FC<MainUIProps> = ({
       {/* 6. Change user ID */}
       {selectedOption === 6 && <ChangeUserId setUserId={setUserId} />}
 
-      {/* 7. Manually change alpha */}
-      {selectedOption === 7 && <ManualAlpha alpha={alpha} setAlpha={setAlpha} />}
+      {/* 7. Manually change alpha (now persists to backend) */}
+      {selectedOption === 7 && (
+        <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />
+      )}
 
       {/* 8. Rate a movie */}
       {selectedOption === 8 && (
@@ -314,9 +319,10 @@ const MovieChatInput: React.FC<{ onSend: (msg: string) => void }> = ({ onSend })
 };
 
 const AdjustEmotion: React.FC<{
+  userId: number;
   alpha: number;
   setAlpha: (a: number) => void;
-}> = ({ alpha, setAlpha }) => {
+}> = ({ userId, alpha, setAlpha }) => {
   const [feedback, setFeedback] = React.useState('');
   const [result, setResult] = React.useState<{
     interpreted: number;
@@ -328,6 +334,7 @@ const AdjustEmotion: React.FC<{
     if (!feedback.trim()) return;
     setLoading(true);
     try {
+      // 1) Call your emotion‐interpretation endpoint
       const resp = await fetch('/api/emotion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -335,13 +342,24 @@ const AdjustEmotion: React.FC<{
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      const newAlpha = data.alpha_adjusted;
       setResult({
         interpreted: data.alpha_interpreted,
-        adjusted: data.alpha_adjusted,
+        adjusted: newAlpha,
       });
-      setAlpha(data.alpha_adjusted);
-    } catch {
-      // ignore
+      setAlpha(newAlpha);
+
+      // 2) Persist newAlpha to your /users/{userId}/alpha endpoint
+      const resp2 = await fetch(`/api/users/${userId}/alpha`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alpha: newAlpha }),
+      });
+      if (!resp2.ok) {
+        console.error('Failed to persist alpha:', await resp2.text());
+      }
+    } catch (err) {
+      console.error('Error adjusting emotion:', err);
     } finally {
       setLoading(false);
     }
@@ -414,40 +432,3 @@ const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId
   );
 };
 
-const ManualAlpha: React.FC<{
-  alpha: number;
-  setAlpha: (a: number) => void;
-}> = ({ alpha, setAlpha }) => {
-  const [temp, setTemp] = React.useState(alpha.toString());
-  return (
-    <div className="pane-container">
-      <h5>7. Manually change similarity threshold (alpha)</h5>
-      <div className="mb-3">
-        <label className="form-label">New alpha (0.0 – 1.0):</label>
-        <input
-          type="number"
-          step="0.01"
-          min={0}
-          max={1}
-          className="form-control"
-          value={temp}
-          onChange={(e) => setTemp(e.target.value)}
-        />
-      </div>
-      <button
-        className="btn btn-primary"
-        onClick={() => {
-          const parsed = parseFloat(temp);
-          if (!isNaN(parsed) && parsed >= 0.0 && parsed <= 1.0) {
-            setAlpha(parsed);
-          } else {
-            alert('Enter a valid number between 0.0 and 1.0.');
-          }
-        }}
-      >
-        Update Alpha
-      </button>
-      <p className="mt-2">Current alpha: {alpha.toFixed(2)}</p>
-    </div>
-  );
-};

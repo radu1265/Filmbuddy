@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [alpha, setAlpha] = useState<number>(0.9);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState<number>(0);
+  
 
 
 
@@ -25,7 +26,27 @@ const App: React.FC = () => {
   };
 
   if (userId === null) {
-    return <AuthPage setUserId={setUserId} setUsername={setUsername} />;
+    return (
+      <AuthPage
+        setUserId={setUserId}
+        setUsername={setUsername}
+        setAlpha={setAlpha}
+        onLoginComplete={(newUserId: number) => {
+          // After login, fetch their rating count and possibly redirect to RateMovie
+          fetch(`/api/users/${newUserId}/rating_count`)
+            .then((res) => res.json())
+            .then((json) => {
+              setRatingCount(json.count);
+              if (json.count < 5) {
+                setSelectedOption(8); // Force “Rate a movie” if under 5 ratings
+              } else {
+                setSelectedOption(1); // Or whatever default you prefer
+              }
+            })
+            .catch((err) => console.error('Could not fetch rating count:', err));
+        }}
+      />
+    );
   }
 
   return (
