@@ -4,37 +4,43 @@ import '../app.css';
 import menuIcon from '../images/menu-button.png';
 
 type HeaderProps = {
-  userId: number;
+  username: string | null;
   alpha: number;
   selectedOption: number | null;
   setSelectedOption: (opt: number | null) => void;
   onExit: () => void;
+  ratingCount: number;
 };
 
 const Header: React.FC<HeaderProps> = ({
-  userId,
+  username,
   alpha,
   selectedOption,
   setSelectedOption,
   onExit,
+  ratingCount,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () =>
+      document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSelect = (opt: number) => {
     setSelectedOption(opt);
     setDropdownOpen(false);
-    if (opt === 8) {
+    if (opt === 9) {
       // When “Exit” is chosen, inform parent to reset everything.
       onExit();
     }
@@ -49,12 +55,16 @@ const Header: React.FC<HeaderProps> = ({
           onClick={() => setDropdownOpen((prev) => !prev)}
           aria-expanded={dropdownOpen}
         >
-          <img src={menuIcon} alt="Menu" style={{ width: '48px', height: '48px' }} />
+          <img
+            src={menuIcon}
+            alt="Menu"
+            style={{ width: '48px', height: '48px' }}
+          />
         </button>
         {dropdownOpen && (
           <ul className="dropdown-menu dropdown-menu-end show">
-            {/* Options 1–7 */}
-            {[1, 2, 3, 4, 5, 6, 7].map((opt) => (
+            {/* Options 1–8 */}
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((opt) => (
               <li key={opt}>
                 <button
                   className="dropdown-item"
@@ -65,25 +75,36 @@ const Header: React.FC<HeaderProps> = ({
               </li>
             ))}
 
-            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <hr className="dropdown-divider" />
+            </li>
 
-            {/* Option 8: Exit */}
+            {/* Option 9: Exit */}
             <li>
               <button
                 className="dropdown-item text-danger"
-                onClick={() => handleSelect(8)}
+                onClick={() => handleSelect(9)}
               >
-                8. Exit
+                9. Exit
               </button>
             </li>
           </ul>
         )}
       </div>
 
-      {/* Display current User ID and alpha */}
-      <div>
-        <span className="me-3"><strong>User ID:</strong> {userId}</span>
-        <span><strong>Alpha:</strong> {alpha.toFixed(2)}</span>
+      {/* Display current Username, alpha, and ratingCount */}
+      <div className="d-flex align-items-center">
+        {username && (
+          <span className="me-3">
+            <strong>Hello,</strong> {username}
+          </span>
+        )}
+        <span className="me-3">
+          <strong>Alpha:</strong> {alpha.toFixed(2)}
+        </span>
+        <span>
+          <strong>Ratings:</strong> {ratingCount}/5
+        </span>
       </div>
     </div>
   );
@@ -105,9 +126,12 @@ function optionText(opt: number): string {
       return 'Change user ID';
     case 7:
       return 'Manually change alpha';
+    case 8:
+      return 'Rate a movie';
     default:
       return '';
   }
 }
 
 export default Header;
+ 

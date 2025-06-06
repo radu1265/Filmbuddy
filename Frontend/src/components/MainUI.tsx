@@ -1,6 +1,8 @@
+// src/components/MainUI.tsx
 import React from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';
+import RateMovie from './RateMovie';
 
 type MainUIProps = {
   userId: number;
@@ -9,6 +11,8 @@ type MainUIProps = {
   setAlpha: (a: number) => void;
   selectedOption: number | null;
   setSelectedOption: (opt: number | null) => void;
+  ratingCount: number;
+  onRatingCountChange: (newCount: number) => void;
 };
 
 const MainUI: React.FC<MainUIProps> = ({
@@ -18,7 +22,20 @@ const MainUI: React.FC<MainUIProps> = ({
   setAlpha,
   selectedOption,
   setSelectedOption,
+  ratingCount,
+  onRatingCountChange,
 }) => {
+  // Prevent access to recommendation screens if fewer than 5 ratings
+  const requireFiveRatings = (): boolean => {
+    if (ratingCount < 5) {
+      alert(`You must rate at least 5 movies first.\n(You've rated ${ratingCount}.)`);
+      // Force them into the “Rate a Movie” pane:
+      setSelectedOption(8);
+      return true;
+    }
+    return false;
+  };
+
   return (
     <div className="flex-grow-1 overflow-auto content-area px-4 py-3">
       {!selectedOption && (
@@ -27,14 +44,42 @@ const MainUI: React.FC<MainUIProps> = ({
         </div>
       )}
 
-      {selectedOption === 1 && <TopMovie userId={userId} alpha={alpha} />}
-      {selectedOption === 2 && <TopList userId={userId} alpha={alpha} />}
+      {/* 1. Top movie recommendation (requires ≥ 5 ratings) */}
+      {selectedOption === 1 && !requireFiveRatings() && (
+        <TopMovie userId={userId} alpha={alpha} />
+      )}
+
+      {/* 2. Top-rated movies list (requires ≥ 5 ratings) */}
+      {selectedOption === 2 && !requireFiveRatings() && (
+        <TopList userId={userId} alpha={alpha} />
+      )}
+
+      {/* 3. Talk about a specific movie */}
       {selectedOption === 3 && <TalkSpecificMovie />}
+
+      {/* 4. Personalize (adjust alpha) */}
       {selectedOption === 4 && <AdjustEmotion alpha={alpha} setAlpha={setAlpha} />}
+
+      {/* 5. Chat with assistant */}
       {selectedOption === 5 && <Chatbot />}
+
+      {/* 6. Change user ID */}
       {selectedOption === 6 && <ChangeUserId setUserId={setUserId} />}
+
+      {/* 7. Manually change alpha */}
       {selectedOption === 7 && <ManualAlpha alpha={alpha} setAlpha={setAlpha} />}
+
+      {/* 8. Rate a movie */}
       {selectedOption === 8 && (
+        <RateMovie
+          userId={userId}
+          currentCount={ratingCount}
+          onCountChange={onRatingCountChange}
+        />
+      )}
+
+      {/* 9. Exit/reset message */}
+      {selectedOption === 9 && (
         <div className="alert alert-warning text-center">
           All state has been reset. The app will now ask for a new User ID.
         </div>
@@ -80,11 +125,7 @@ const TopMovie: React.FC<{
       <p>
         <strong>User ID:</strong> {userId} | <strong>Alpha:</strong> {alpha.toFixed(2)}
       </p>
-      <button
-        className="btn btn-primary mb-3"
-        onClick={fetchTop}
-        disabled={loading}
-      >
+      <button className="btn btn-primary mb-3" onClick={fetchTop} disabled={loading}>
         {loading ? 'Loading…' : 'Get Recommendation'}
       </button>
       {result && (
@@ -102,9 +143,7 @@ const TopList: React.FC<{
   alpha: number;
 }> = ({ userId, alpha }) => {
   const [n, setN] = React.useState(5);
-  const [results, setResults] = React.useState<
-    Array<{ title: string; hybrid_score: number }>
-  >([]);
+  const [results, setResults] = React.useState<Array<{ title: string; hybrid_score: number }>>([]);
   const [loading, setLoading] = React.useState(false);
 
   const fetchList = async () => {
@@ -143,11 +182,7 @@ const TopList: React.FC<{
           onChange={(e) => setN(parseInt(e.target.value || '5', 10))}
         />
       </div>
-      <button
-        className="btn btn-primary mb-3"
-        onClick={fetchList}
-        disabled={loading}
-      >
+      <button className="btn btn-primary mb-3" onClick={fetchList} disabled={loading}>
         {loading ? 'Loading…' : `Get Top ${n}`}
       </button>
       {results.length > 0 && (
@@ -165,9 +200,7 @@ const TopList: React.FC<{
 
 const TalkSpecificMovie: React.FC = () => {
   const [movieName, setMovieName] = React.useState('');
-  const [history, setHistory] = React.useState<
-    Array<{ role: string; content: string }>
-  >([]);
+  const [history, setHistory] = React.useState<Array<{ role: string; content: string }>>([]);
   const [chatting, setChatting] = React.useState(false);
 
   const startDiscussion = () => {
@@ -328,7 +361,11 @@ const AdjustEmotion: React.FC<{
           placeholder="e.g. I loved that last movie!"
         />
       </div>
-      <button className="btn btn-primary mb-3" onClick={submitEmotion} disabled={loading}>
+      <button
+        className="btn btn-primary mb-3"
+        onClick={submitEmotion}
+        disabled={loading}
+      >
         {loading ? 'Interpreting…' : 'Submit Feedback'}
       </button>
       {result && (
@@ -366,8 +403,6 @@ const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId
           if (parsed >= 1 && parsed <= 1000) {
             setUserId(parsed);
             setTemp('');
-            // Optionally reset selectedOption so the user sees the menu again:
-            // setSelectedOption(null);
           } else {
             alert('Enter a valid ID between 1 and 1000.');
           }

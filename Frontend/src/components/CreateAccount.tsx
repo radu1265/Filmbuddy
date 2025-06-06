@@ -12,7 +12,9 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
   const [gender, setGender] = useState<'M' | 'F' | ''>('');
   const [occupation, setOccupation] = useState('');
   const [zipCode, setZipCode] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -23,17 +25,20 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
       gender === '' ||
       !occupation.trim() ||
       !zipCode.trim() ||
-      password.length < 4
+      !username.trim() ||
+      password.length < 4 ||
+      password !== confirmPassword
+      
     ) {
       setError("Please fill in all fields (password ≥ 4 chars).");
       return;
     }
     // Register the user
     try {
-      const resp = await fetch('http://localhost:5000/users/register', {
+      const resp = await fetch('/api/users/register', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ age, gender, occupation, zip_code: zipCode, password }),
+        body: JSON.stringify({ age, gender, occupation, zip_code: zipCode, username, password }),
       });
       if (!resp.ok) throw new Error("Registration failed");
       const data = await resp.json();
@@ -43,10 +48,6 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
     } catch (err: any) {
       setError(err.message || "Registration error");
     }
-
-    // // For now, just simulate success with a dummy ID:
-    // const newId = Math.floor(Math.random() * 10000) + 1000;
-    // onRegistered(newId);
   };
 
   return (
@@ -106,6 +107,17 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
                 placeholder="Enter your zip code"
               />
             </div>
+            <div className="mb-3">
+              <label htmlFor="username-input" className="form-label">Username</label>
+              <input
+                id="username-input"
+                type="text"
+                className="form-control"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
+              />
+            </div>
             <div className="mb-4">
               <label htmlFor="password-input" className="form-label">Password</label>
               <input
@@ -115,6 +127,17 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Choose a password"
+              />
+            </div>
+            <div className="mb-4">
+              <label htmlFor="confirm-password-input" className="form-label">Confirm Password</label>
+              <input
+                id="confirm-password-input"
+                type="password"
+                className="form-control"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your password"
               />
             </div>
             <button type="submit" className="btn btn-success w-100">

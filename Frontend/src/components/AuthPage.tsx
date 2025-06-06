@@ -3,87 +3,86 @@ import React, { useState } from 'react';
 import CreateAccount from './CreateAccount';
 
 type AuthPageProps = {
-  // After successful “login,” we call setUserId with a numeric ID.
+  // After successful “login,” we call setUserId with a numeric ID,
+  // and setUsername with the string username.
   setUserId: (id: number) => void;
+  setUsername: (name: string) => void;
 };
 
-const AuthPage: React.FC<AuthPageProps> = ({ setUserId }) => {
+const AuthPage: React.FC<AuthPageProps> = ({ setUserId, setUsername }) => {
   const [isRegistering, setIsRegistering] = useState(false);
 
   // State for login form
-  const [username, setUsername] = useState('');
+  const [username, setUsernameInput] = useState('');
   const [password, setPassword] = useState('');
 
   // Handler when registration completes (we receive a newUserId)
   const handleSuccessfulRegistration = (newUserId: number) => {
-    // You might want to auto-login them here, or just switch back to login screen.
-    // For now, let’s just pass the ID upward and stay on login:
     setUserId(newUserId);
+    // Optionally setUsername here if CreateAccount returns the username
   };
 
   // Toggle between login vs registration
   const toggleMode = () => {
     setIsRegistering((prev) => !prev);
-    // Clear login fields when switching
-    setUsername('');
+    setUsernameInput('');
     setPassword('');
   };
 
   // ------------ LOGIN FORM HANDLER ----------------
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // 1) Validate that "username" is a nonempty numeric string
-  const trimmedUsername = username.trim();
-  if (!trimmedUsername) {
-    alert("Please enter your user ID.");
-    return;
-  }
-  const numericId = Number(trimmedUsername);
-  if (!Number.isInteger(numericId) || numericId <= 0) {
-    alert("User ID must be a positive integer.");
-    return;
-  }
-
-  // 2) Validate password length
-  if (password.length < 4) {
-    alert("Password must be at least 4 characters.");
-    return;
-  }
-
-  // 3) Build payload and send request
-  const payload = { user_id: numericId, password };
-  try {
-    const resp = await fetch('/api/users/login', {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    console.log("Login request sent:", payload);
-    console.log("Response status:", resp.status);
-
-    if (!resp.ok) {
-      // Attempt to read JSON error detail from backend
-      let detail = "Login failed. Please try again.";
-      try {
-        const errJson = await resp.json();
-        if (errJson.detail) detail = errJson.detail;
-      } catch {
-        // ignore parse errors
-      }
-      throw new Error(detail);
+    // 1) Validate that "username" is nonempty
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) {
+      alert('Please enter your username.');
+      return;
     }
 
-    const data = await resp.json();
-    console.log("Login successful:", data);
+    // 2) Validate password length
+    if (password.length < 4) {
+      alert('Password must be at least 4 characters.');
+      return;
+    }
 
-    setUserId(numericId); // Pass the user ID to parent component
-  } catch (err: any) {
-    console.error("Login error:", err);
-    alert(err.message || "Login failed. Please try again.");
-  }
-};
+    // 3) Build payload and send request
+    const payload = { username: trimmedUsername, password };
+    try {
+      const resp = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('Login request sent:', payload);
+      console.log('Response status:', resp.status);
+
+      if (!resp.ok) {
+        let detail = 'Login failed. Please try again.';
+        try {
+          const errJson = await resp.json();
+          if (errJson.detail) detail = errJson.detail;
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(detail);
+      }
+
+      const data = await resp.json();
+      console.log('Login successful:', data);
+
+      // 4) Extract numeric user_id from response and store both ID and username
+      if (typeof data.user_id !== 'number') {
+        throw new Error('Invalid response from server.');
+      }
+      setUserId(data.user_id);
+      setUsername(trimmedUsername);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      alert(err.message || 'Login failed. Please try again.');
+    }
+  };
 
   // ------------ RENDER ----------------
   if (isRegistering) {
@@ -111,7 +110,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 type="text"
                 className="form-control"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsernameInput(e.target.value)}
                 placeholder="Enter your username"
               />
             </div>
@@ -133,10 +132,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </button>
           </form>
           <hr />
-          <button
-            className="btn btn-link w-100"
-            onClick={toggleMode}
-          >
+          <button className="btn btn-link w-100" onClick={toggleMode}>
             Create a new account
           </button>
         </div>
