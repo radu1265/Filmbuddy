@@ -3,7 +3,7 @@ import traceback
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from ollama import Client
@@ -12,12 +12,18 @@ from recommendation import alg  # your existing recommendation.alg module
 from user_utils import get_db_connection
 import bcrypt
 
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
 from user_utils import (
     add_new_user,
     list_all_movies,
     add_or_update_rating,
-    user_exists
+    user_exists,
+    create_access_token,
+    get_current_user
 )
+
+
 
 # Globals to hold the Ollama server context and client
 ollama_server: OllamaServer = None
@@ -307,7 +313,7 @@ async def get_rating_count(user_id: int):
 
 
 @app.post("/users/login")
-async def login_user(data: Dict[str, Any]):
+async def login_user(data: Dict[str, Any], response: Response):
     """
     POST /users/login
     Body JSON: { "username": str, "password": str }
@@ -343,22 +349,34 @@ async def login_user(data: Dict[str, Any]):
 
     # If it’s a dummy account, accept only “admin”
     if is_dummy:
-        if raw_password == "admin":
-            return {"user_id": user_id, "alpha": stored_alpha, "success": True}
-        else:
+        if raw_password != "admin":
             raise HTTPException(status_code=401, detail="Incorrect password for dummy.")
+    else:
+        # Real user — verify stored_hash
+        if stored_hash is None:
+            raise HTTPException(status_code=500, detail="No password set for this user.")
+        if isinstance(stored_hash, memoryview):
+            stored_hash = bytes(stored_hash)
+        if not bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash):
+            raise HTTPException(status_code=401, detail="Incorrect password.")
 
-    # Real user — verify stored_hash
-    if stored_hash is None:
-        raise HTTPException(status_code=500, detail="No password set for this user.")
-    if isinstance(stored_hash, memoryview):
-        stored_hash = bytes(stored_hash)
+    # At this point authentication succeeded; issue JWT cookie
+    token = create_access_token({"user_id": user_id})
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=False,       # set True in production (HTTPS)
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
 
-    if not bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash):
-        raise HTTPException(status_code=401, detail="Incorrect password.")
-
-    # Return the stored alpha along with user_id
     return {"user_id": user_id, "alpha": stored_alpha, "success": True}
+
+@app.post("/users/logout")
+async def logout(response: Response):
+    response.delete_cookie("session_token")
+    return {"success": True}
 
 @app.put("/users/{user_id}/alpha")
 async def update_user_alpha(user_id: int, data: Dict[str, Any]):
@@ -386,6 +404,165 @@ async def update_user_alpha(user_id: int, data: Dict[str, Any]):
     cur.close()
     conn.close()
     return {"alpha": new_alpha}
+
+@app.get("/users/by-username/{username}")
+async def get_user_by_username(username: str):
+    """
+    GET /api/users/by-username/{username}
+    Returns { "user_id": int } or 404 if not found
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT user_id FROM users WHERE username = %s;",
+        (username,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found.")
+    return {"user_id": row[0]}
+
+from fastapi import HTTPException, Depends
+from typing import Dict, Any
+
+@app.post("/chats/send")
+async def send_message(
+    data: Dict[str, Any],
+    from_user_id: int = Depends(get_current_user)   # now derived from the session cookie
+):
+    """
+    POST /api/chats/send
+    Body JSON: { "to_user_id": int, "text": str }
+    Returns { "success": True } or HTTPException
+    """
+    to_user_id = data.get("to_user_id")
+    text       = (data.get("text") or "").strip()
+
+    # 1) Basic type checks
+    if not isinstance(to_user_id, int):
+        raise HTTPException(status_code=400, detail="to_user_id must be an integer.")
+    if to_user_id == from_user_id:
+        raise HTTPException(status_code=400, detail="Cannot send a message to yourself.")
+    if not text:
+        raise HTTPException(status_code=400, detail="Message text cannot be empty.")
+
+    # 2) Existence check for recipient
+    if not user_exists(to_user_id):
+        raise HTTPException(status_code=404, detail=f"Recipient user {to_user_id} not found.")
+
+    # 3) Insert into DB
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO messages (from_user_id, to_user_id, text)
+        VALUES (%s, %s, %s);
+        """,
+        (from_user_id, to_user_id, text),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"success": True}
+
+
+
+
+@app.get("/chats/history")
+async def get_history(
+    peer_id: int,
+    current_user: int = Depends(get_current_user),
+):
+    """
+    GET /api/chats/history?user1=<int>&user2=<int>
+    Returns JSON: { "messages": [ { "from": int, "to": int, "text": str, "ts": str }, … ] }
+    Only returns messages where (from = user1 AND to = user2) OR (from = user2 AND to = user1), ordered by timestamp ascending.
+    """
+    user1 = current_user
+    user2 = peer_id
+
+    if not isinstance(user1, int) or not isinstance(user2, int):
+        raise HTTPException(status_code=400, detail="user1 and user2 must be integers.")
+    # In a production app, confirm that the caller is either user1 or user2, to prevent snooping.
+    # For now, we assume the front-end won’t lie.
+    if not user_exists(user1) or not user_exists(user2):
+        raise HTTPException(status_code=404, detail="One or both users not found.")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT from_user_id, to_user_id, text, created_at
+          FROM messages
+         WHERE (from_user_id = %s AND to_user_id = %s)
+            OR (from_user_id = %s AND to_user_id = %s)
+         ORDER BY created_at ASC;
+        """,
+        (user1, user2, user2, user1),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return {
+        "messages": [
+            {
+                "from": r[0],
+                "to": r[1],
+                "text": r[2],
+                "ts": r[3].isoformat(),
+            }
+            for r in rows
+        ]
+    }
+
+@app.get("/chats/unread")
+async def get_unread_messages(current_user: int = Depends(get_current_user)):
+    """
+    GET /api/chats/unread
+    Returns all messages sent *to* current_user that have not yet been marked seen,
+    along with the sender's username. Then marks them seen.
+    """
+    user_id = current_user
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # 1) Select unread messages + sender username
+    cur.execute(
+        """
+        SELECT m.message_id, m.from_user_id, u.username AS from_username, m.text, m.created_at
+          FROM messages m
+          JOIN users u ON u.user_id = m.from_user_id
+         WHERE m.to_user_id = %s
+           AND m.seen = FALSE
+         ORDER BY m.created_at ASC;
+        """,
+        (user_id,),
+    )
+    rows = cur.fetchall()
+
+    # 2) Mark them seen
+    cur.execute(
+        "UPDATE messages SET seen = TRUE WHERE to_user_id = %s AND seen = FALSE;",
+        (user_id,),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "message_id":   row[0],
+            "from_user_id": row[1],
+            "from_username": row[2],
+            "text":         row[3],
+            "ts":           row[4].isoformat(),
+        }
+        for row in rows
+    ]
 
 
 @app.get("/movies")

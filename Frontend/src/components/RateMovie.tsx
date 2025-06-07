@@ -22,7 +22,7 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const resp = await fetch('/api/movies');
+        const resp = await fetch('/api/movies',{credentials: 'include'});
         console.log(resp);
         if (!resp.ok) throw new Error('Failed to load movies');
         const data = await resp.json(); // expect { movies: [ {movie_id, title}, … ] }
@@ -63,6 +63,7 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
     try {
       const resp = await fetch('/api/ratings', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });

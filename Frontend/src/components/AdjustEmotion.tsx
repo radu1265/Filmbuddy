@@ -21,6 +21,7 @@ const AdjustEmotion: React.FC<AdjustEmotionProps> = ({ userId, alpha, setAlpha }
       // 1) Call your emotion‐interpretation endpoint
       const resp = await fetch('/api/emotion', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_text: feedback, alpha }),
       });
@@ -36,6 +37,7 @@ const AdjustEmotion: React.FC<AdjustEmotionProps> = ({ userId, alpha, setAlpha }
       // 2) Persist newAlpha to your /users/{user_id}/alpha endpoint
       const resp2 = await fetch(`/api/users/${userId}/alpha`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alpha: newAlpha }),
       });

@@ -1,9 +1,10 @@
 // src/components/MainUI.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';
 import RateMovie from './RateMovie';
 import ManualAlpha from './ManualAlpha';
+import ChatWindow from './ChatWindow';
 
 type MainUIProps = {
   userId: number;
@@ -37,6 +38,23 @@ const MainUI: React.FC<MainUIProps> = ({
     return false;
   };
 
+  const [peerUsernameInput, setPeerUsernameInput] = useState<string>('');
+  const [peerId, setPeerId]                       = useState<number | null>(null);
+  const [peerUsername, setPeerUsername]           = useState<string>('');
+
+  // const handleStartChat = () => {
+  //   const pid = parseInt(peerIdInput.trim() || '0', 10);
+  //   if (!Number.isInteger(pid) || pid <= 0) {
+  //     alert('Enter a valid peer user ID (positive integer).');
+  //     return;
+  //   }
+  //   if (pid === userId) {
+  //     alert("You can't chat with yourself.");
+  //     return;
+  //   }
+  //   setPeerId(pid);
+  // };
+
   return (
     <div className="flex-grow-1 overflow-auto content-area px-4 py-3">
       {!selectedOption && (
@@ -66,8 +84,67 @@ const MainUI: React.FC<MainUIProps> = ({
       {/* 5. Chat with assistant */}
       {selectedOption === 5 && <Chatbot />}
 
-      {/* 6. Change user ID */}
-      {selectedOption === 6 && <ChangeUserId setUserId={setUserId} />}
+      {/* 6. Chat with another user (polling‐based) */}
+      {selectedOption === 6 && (
+        <div className="pane-container">
+          <h5>6. Chat with a user</h5>
+
+          {!peerId ? (
+            <>
+              <p>Enter the <strong>username</strong> of the person you want to chat with:</p>
+              <div className="d-flex mb-3" style={{ maxWidth: '300px' }}>
+                <input
+                  type="text"
+                  className="form-control me-2"
+                  placeholder="Peer username"
+                  value={peerUsernameInput}
+                  onChange={(e) => setPeerUsernameInput(e.target.value)}
+                />
+                <button className="btn btn-primary" onClick={async () => {
+                  const name = peerUsernameInput.trim();
+                  if (!name) {
+                    alert('Please enter a username.');
+                    return;
+                  }
+                  try {
+                    const resp = await fetch(`/api/users/by-username/${encodeURIComponent(name)}`, {credentials: 'include'});
+                    if (!resp.ok) {
+                      const err = await resp.json();
+                      throw new Error(err.detail || `HTTP ${resp.status}`);
+                    }
+                    const data = await resp.json();
+                    setPeerId(data.user_id);
+                    setPeerUsername(name);
+                  } catch (err: any) {
+                    alert(`Could not find user:\n${err.message}`);
+                  }
+                }}>
+                  Start
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn btn-secondary mb-2"
+                onClick={() => {
+                  setPeerId(null);
+                  setPeerUsernameInput('');
+                }}
+              >
+                Change Chat
+              </button>
+                  {peerId && (
+                    <ChatWindow
+                      currentUserId={userId}
+                      peerId={peerId}
+                      peerUsername={peerUsername}
+                    />
+                  )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* 7. Manually change alpha (now persists to backend) */}
       {selectedOption === 7 && (
@@ -111,6 +188,7 @@ const TopMovie: React.FC<{
     try {
       const resp = await fetch('/api/recommend/top', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, alpha }),
       });
@@ -156,6 +234,7 @@ const TopList: React.FC<{
     try {
       const resp = await fetch('/api/recommend/top_list', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, alpha, n }),
       });
@@ -224,6 +303,7 @@ const TalkSpecificMovie: React.FC = () => {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ history: newHistory }),
       });
@@ -337,6 +417,7 @@ const AdjustEmotion: React.FC<{
       // 1) Call your emotion‐interpretation endpoint
       const resp = await fetch('/api/emotion', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_text: feedback, alpha }),
       });
@@ -352,6 +433,7 @@ const AdjustEmotion: React.FC<{
       // 2) Persist newAlpha to your /users/{userId}/alpha endpoint
       const resp2 = await fetch(`/api/users/${userId}/alpha`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alpha: newAlpha }),
       });
@@ -394,40 +476,6 @@ const AdjustEmotion: React.FC<{
           </p>
         </div>
       )}
-    </div>
-  );
-};
-
-const ChangeUserId: React.FC<{ setUserId: (id: number) => void }> = ({ setUserId }) => {
-  const [temp, setTemp] = React.useState('');
-  return (
-    <div className="pane-container">
-      <h5>6. Change user ID</h5>
-      <div className="mb-3">
-        <label className="form-label">New User ID (1 – 1000):</label>
-        <input
-          type="number"
-          className="form-control"
-          min={1}
-          max={1000}
-          value={temp}
-          onChange={(e) => setTemp(e.target.value)}
-        />
-      </div>
-      <button
-        className="btn btn-primary"
-        onClick={() => {
-          const parsed = parseInt(temp || '0', 10);
-          if (parsed >= 1 && parsed <= 1000) {
-            setUserId(parsed);
-            setTemp('');
-          } else {
-            alert('Enter a valid ID between 1 and 1000.');
-          }
-        }}
-      >
-        Update User ID
-      </button>
     </div>
   );
 };

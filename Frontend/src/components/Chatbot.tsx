@@ -69,6 +69,7 @@ export const Chatbot: React.FC = () => {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ history: [...history, userMsg] }),
       });

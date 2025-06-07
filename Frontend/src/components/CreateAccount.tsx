@@ -37,6 +37,7 @@ const CreateAccount: React.FC<CreateAccountProps> = ({ onRegistered, onCancel })
     try {
       const resp = await fetch('/api/users/register', {
         method: "POST",
+        credentials: 'include',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ age, gender, occupation, zip_code: zipCode, username, password }),
       });

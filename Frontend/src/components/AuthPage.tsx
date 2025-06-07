@@ -45,6 +45,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
     try {
       const resp = await fetch('/api/users/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });

@@ -6,6 +6,7 @@ import MainUI from './components/MainUI';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import './app.css';
+import ChatNotifications from './components/ChatNotifications';
 
 const App: React.FC = () => {
   const [username, setUsername] = useState<string>('');
@@ -17,14 +18,24 @@ const App: React.FC = () => {
 
 
 
-  const handleExit = () => {
-    // When Exit is chosen from Header, reset everything so AuthPage re‐appears:
-    setUsername('');
-    setUserId(null);
-    setAlpha(0.9);
-    setSelectedOption(null);
-  };
-
+  const handleExit = async () => {
+      try {
+        // 1) hit your logout endpoint to delete the cookie
+        await fetch('/api/users/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (e) {
+        console.error('Logout failed:', e);
+      } finally {
+        // 2) clear all local state
+        setUserId(null);
+        setUsername('');
+        setAlpha(0.9);
+        setRatingCount(0);
+        setSelectedOption(null);
+      }
+    };
   if (userId === null) {
     return (
       <AuthPage
@@ -33,7 +44,7 @@ const App: React.FC = () => {
         setAlpha={setAlpha}
         onLoginComplete={(newUserId: number) => {
           // After login, fetch their rating count and possibly redirect to RateMovie
-          fetch(`/api/users/${newUserId}/rating_count`)
+          fetch(`/api/users/${newUserId}/rating_count`, {credentials: 'include'})
             .then((res) => res.json())
             .then((json) => {
               setRatingCount(json.count);
@@ -59,6 +70,7 @@ const App: React.FC = () => {
         onExit={handleExit}
         ratingCount={ratingCount}
       />
+      <ChatNotifications currentUserId={userId} />
       <MainUI
         userId={userId!}
         alpha={alpha}

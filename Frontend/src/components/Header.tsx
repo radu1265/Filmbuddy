@@ -123,7 +123,7 @@ function optionText(opt: number): string {
     case 5:
       return 'Chat with assistant';
     case 6:
-      return 'Change user ID';
+      return 'Chat with user';
     case 7:
       return 'Manually change alpha';
     case 8:

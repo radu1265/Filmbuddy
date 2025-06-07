@@ -25,6 +25,7 @@ const ManualAlpha: React.FC<ManualAlphaProps> = ({ userId, alpha, setAlpha }) =>
       // 2) Persist to backend
       const resp = await fetch(`/api/users/${userId}/alpha`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alpha: parsed }),
       });

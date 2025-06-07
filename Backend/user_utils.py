@@ -3,6 +3,16 @@ from dotenv import load_dotenv
 import os
 import psycopg2
 import bcrypt
+import jwt
+from datetime import datetime, timedelta
+from fastapi import HTTPException, Request
+from typing import Optional
+
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -122,3 +132,24 @@ def add_or_update_rating(user_id: int, movie_id: int, rating: int) -> None:
     conn.commit()
     cur.close()
     conn.close()
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("user_id")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+    if user_id is None or not user_exists(user_id):
+        raise HTTPException(status_code=401, detail="User not found")
+    # you can fetch and return a full user object here if needed
+    return user_id
+
