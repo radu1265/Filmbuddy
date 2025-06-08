@@ -427,6 +427,294 @@ async def get_user_by_username(username: str):
 from fastapi import HTTPException, Depends
 from typing import Dict, Any
 
+@app.get("/users/friends")
+async def list_friends(current_user: int = Depends(get_current_user)):
+    """
+    List all friends of the current user.
+    Returns: [ { "user_id": int, "username": str }, ... ]
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    print
+    cur.execute(
+        """
+        SELECT u.user_id, u.username
+          FROM friends f
+          JOIN users u ON u.user_id = f.friend_id
+         WHERE f.user_id = %s
+         ORDER BY u.username;
+        """,
+        (current_user,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [{"user_id": r[0], "username": r[1]} for r in rows]
+
+@app.post("/users/friends")
+async def add_friend(
+    data: Dict[str, Any],
+    current_user: int = Depends(get_current_user),
+):
+    """
+    POST /api/users/friends
+    Body JSON: { "friend_id": int } or { "friend_username": str }
+    """
+    fid = data.get("friend_id")
+    if fid is None:
+        uname = data.get("friend_username", "").strip()
+        if not uname:
+            raise HTTPException(status_code=400, detail="Must provide friend_id or friend_username.")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM users WHERE username = %s;", (uname,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"User '{uname}' not found.")
+        fid = row[0]
+
+    if not isinstance(fid, int):
+        raise HTTPException(status_code=400, detail="friend_id must be an integer.")
+    if fid == current_user:
+        raise HTTPException(status_code=400, detail="Cannot friend yourself.")
+    if not user_exists(fid):
+        raise HTTPException(status_code=404, detail=f"User {fid} not found.")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO friends (user_id, friend_id)
+        VALUES (%s, %s)
+        ON CONFLICT DO NOTHING;
+        """,
+        (current_user, fid),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"success": True}
+
+
+@app.delete("/users/friends/{friend_id}")
+async def remove_friend(
+    friend_id: int,
+    current_user: int = Depends(get_current_user),
+):
+    """
+    DELETE /api/users/friends/{friend_id}
+    Removes the mutual friendship AND any friend_requests between the two users.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 1) Remove both directions of the friendship
+    cur.execute(
+        """
+        DELETE FROM friends
+         WHERE (user_id = %s AND friend_id = %s)
+            OR (user_id = %s AND friend_id = %s);
+        """,
+        (current_user, friend_id, friend_id, current_user),
+    )
+
+    # 2) Remove any friend_requests between them (any status)
+    cur.execute(
+        """
+        DELETE FROM friend_requests
+         WHERE (from_user_id = %s AND to_user_id = %s)
+            OR (from_user_id = %s AND to_user_id = %s);
+        """,
+        (current_user, friend_id, friend_id, current_user),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"success": True}
+
+
+# 1️⃣ Send a friend request
+@app.post("/users/friend_requests")
+async def send_friend_request(
+    data: Dict[str, Any],
+    current_user: int = Depends(get_current_user),
+):
+    """
+    POST /api/users/friend_requests
+    Body JSON: { "friend_username": str } (or "friend_id": int)
+    """
+    fid = data.get("friend_id")
+    if fid is None:
+        uname = (data.get("friend_username") or "").strip()
+        if not uname:
+            raise HTTPException(400, "Must provide friend_username or friend_id")
+        conn = get_db_connection(); cur = conn.cursor()
+        cur.execute("SELECT user_id FROM users WHERE username = %s;", (uname,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            raise HTTPException(404, f"User '{uname}' not found.")
+        fid = row[0]
+
+    if not isinstance(fid, int):
+        raise HTTPException(400, "friend_id must be an integer")
+    if fid == current_user:
+        raise HTTPException(400, "Cannot friend yourself")
+    if not user_exists(fid):
+        raise HTTPException(404, f"User {fid} not found")
+
+    conn = get_db_connection(); cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO friend_requests (from_user_id, to_user_id)
+            VALUES (%s, %s)
+            ON CONFLICT (from_user_id,to_user_id) DO NOTHING;
+            """,
+            (current_user, fid),
+        )
+        conn.commit()
+    finally:
+        cur.close(); conn.close()
+
+    return {"success": True}
+
+
+# 2️⃣ List incoming requests
+@app.get("/users/friend_requests")
+async def list_friend_requests(current_user: int = Depends(get_current_user)):
+    """
+    GET /api/users/friend_requests
+    Returns a list of pending requests TO me:
+      [ { request_id, from_user_id, from_username, created_at }, … ]
+    """
+    conn = get_db_connection(); cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT fr.request_id,
+               fr.from_user_id,
+               u.username AS from_username,
+               fr.created_at
+          FROM friend_requests fr
+          JOIN users u ON u.user_id = fr.from_user_id
+         WHERE fr.to_user_id = %s
+           AND fr.status = 'pending'
+         ORDER BY fr.created_at ASC;
+        """,
+        (current_user,),
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+
+    return [
+        {
+          "request_id":    r[0],
+          "from_user_id":  r[1],
+          "from_username": r[2],
+          "created_at":    r[3].isoformat(),
+        }
+        for r in rows
+    ]
+
+
+# 3️⃣ Respond to a request
+@app.post("/users/friend_requests/{request_id}/respond")
+async def respond_friend_request(
+    request_id: int,
+    data: Dict[str, Any],
+    current_user: int = Depends(get_current_user),
+):
+    """
+    POST /api/users/friend_requests/{request_id}/respond
+    Body JSON: { "accept": boolean }
+    """
+    accept = data.get("accept")
+    if not isinstance(accept, bool):
+        raise HTTPException(status_code=400, detail="Missing 'accept' boolean")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 1) Verify there is a pending request to this user
+    cur.execute(
+        """
+        SELECT from_user_id, to_user_id
+          FROM friend_requests
+         WHERE request_id = %s
+           AND status = 'pending';
+        """,
+        (request_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Request not found or already handled")
+
+    fid, tid = row
+    if tid != current_user:
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=403, detail="Not your request to respond to")
+
+    # 2) If accepted, insert mutual friendship
+    if accept:
+        cur.execute(
+            """
+            INSERT INTO friends (user_id, friend_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING;
+            INSERT INTO friends (user_id, friend_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING;
+            """,
+            (current_user, fid, fid, current_user),
+        )
+
+    # 3) Delete the request row regardless of accept/reject
+    cur.execute(
+        "DELETE FROM friend_requests WHERE request_id = %s;",
+        (request_id,),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"success": True}
+
+@app.get("/users/friend_requests/outgoing")
+async def list_outgoing_requests(current_user: int = Depends(get_current_user)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT fr.request_id,
+               fr.to_user_id,
+               u.username AS to_username
+          FROM friend_requests fr
+          JOIN users u ON u.user_id = fr.to_user_id
+         WHERE fr.from_user_id = %s
+           AND fr.status = 'pending'
+         ORDER BY fr.created_at;
+        """,
+        (current_user,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [
+      {"request_id": r[0], "to_user_id": r[1], "to_username": r[2]}
+      for r in rows
+    ]
+
 @app.post("/chats/send")
 async def send_message(
     data: Dict[str, Any],

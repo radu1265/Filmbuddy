@@ -9,7 +9,6 @@ import ChatWindow from './ChatWindow';
 type MainUIProps = {
   userId: number;
   alpha: number;
-  setUserId: (id: number) => void;
   setAlpha: (a: number) => void;
   selectedOption: number | null;
   setSelectedOption: (opt: number | null) => void;
@@ -20,7 +19,6 @@ type MainUIProps = {
 const MainUI: React.FC<MainUIProps> = ({
   userId,
   alpha,
-  setUserId,
   setAlpha,
   selectedOption,
   setSelectedOption,
