@@ -90,7 +90,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   return (
     <div className="pane-container d-flex flex-column" style={{ height: '100%' }}>
-      <h5>Chat with {peerUsername}</h5>
 
       <div
         ref={historyRef}

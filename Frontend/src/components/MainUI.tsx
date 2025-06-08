@@ -1,12 +1,12 @@
 // src/components/MainUI.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Chatbot } from './Chatbot';
 import '../app.css';
 import RateMovie from './RateMovie';
 import ManualAlpha from './ManualAlpha';
 import ChatWindow from './ChatWindow';
 
-type MainUIProps = {
+export type MainUIProps = {
   userId: number;
   alpha: number;
   setAlpha: (a: number) => void;
@@ -14,6 +14,12 @@ type MainUIProps = {
   setSelectedOption: (opt: number | null) => void;
   ratingCount: number;
   onRatingCountChange: (newCount: number) => void;
+
+  // Chat peers lifted to parent
+  peerId: number | null;
+  peerUsername: string;
+  setPeerId: (id: number | null) => void;
+  setPeerUsername: (name: string) => void;
 };
 
 const MainUI: React.FC<MainUIProps> = ({
@@ -24,12 +30,14 @@ const MainUI: React.FC<MainUIProps> = ({
   setSelectedOption,
   ratingCount,
   onRatingCountChange,
+  peerId,
+  peerUsername,
+  setPeerId,
+  setPeerUsername,
 }) => {
-  // Prevent access to recommendation screens if fewer than 5 ratings
   const requireFiveRatings = (): boolean => {
     if (ratingCount < 5) {
       alert(`You must rate at least 5 movies first.\n(You've rated ${ratingCount}.)`);
-      // Force them into the “Rate a Movie” pane:
       setSelectedOption(8);
       return true;
     }
@@ -37,21 +45,18 @@ const MainUI: React.FC<MainUIProps> = ({
   };
 
   const [peerUsernameInput, setPeerUsernameInput] = useState<string>('');
-  const [peerId, setPeerId]                       = useState<number | null>(null);
-  const [peerUsername, setPeerUsername]           = useState<string>('');
+  useEffect(() => {
+    if (peerUsername) {
+      setPeerUsernameInput(peerUsername);
+    }
+  }, [peerUsername]);
 
-  // const handleStartChat = () => {
-  //   const pid = parseInt(peerIdInput.trim() || '0', 10);
-  //   if (!Number.isInteger(pid) || pid <= 0) {
-  //     alert('Enter a valid peer user ID (positive integer).');
-  //     return;
-  //   }
-  //   if (pid === userId) {
-  //     alert("You can't chat with yourself.");
-  //     return;
-  //   }
-  //   setPeerId(pid);
-  // };
+  console.log('MainUI render:', {
+    selectedOption,
+    peerId,
+    peerUsername,
+    peerUsernameInput,
+  });
 
   return (
     <div className="flex-grow-1 overflow-auto content-area px-4 py-3">
@@ -61,35 +66,21 @@ const MainUI: React.FC<MainUIProps> = ({
         </div>
       )}
 
-      {/* 1. Top movie recommendation (requires ≥ 5 ratings) */}
-      {selectedOption === 1 && !requireFiveRatings() && (
-        <TopMovie userId={userId} alpha={alpha} />
-      )}
-
-      {/* 2. Top-rated movies list (requires ≥ 5 ratings) */}
-      {selectedOption === 2 && !requireFiveRatings() && (
-        <TopList userId={userId} alpha={alpha} />
-      )}
-
-      {/* 3. Talk about a specific movie */}
+      {selectedOption === 1 && !requireFiveRatings() && <TopMovie userId={userId} alpha={alpha} />}
+      {selectedOption === 2 && !requireFiveRatings() && <TopList userId={userId} alpha={alpha} />}
       {selectedOption === 3 && <TalkSpecificMovie />}
-
-      {/* 4. Personalize (adjust alpha) */}
-      {selectedOption === 4 && (
-        <AdjustEmotion userId={userId} alpha={alpha} setAlpha={setAlpha} />
-      )}
-
-      {/* 5. Chat with assistant */}
+      {selectedOption === 4 && <AdjustEmotion userId={userId} alpha={alpha} setAlpha={setAlpha} />}
       {selectedOption === 5 && <Chatbot />}
 
-      {/* 6. Chat with another user (polling‐based) */}
       {selectedOption === 6 && (
         <div className="pane-container">
-          <h5>6. Chat with a user</h5>
+          <h5>6. {peerId ? `Chat with ${peerUsername}` : 'Chat with a user'}</h5>
 
           {!peerId ? (
             <>
-              <p>Enter the <strong>username</strong> of the person you want to chat with:</p>
+              <p>
+                Enter the <strong>username</strong> of the person you want to chat with:
+              </p>
               <div className="d-flex mb-3" style={{ maxWidth: '300px' }}>
                 <input
                   type="text"
@@ -98,25 +89,31 @@ const MainUI: React.FC<MainUIProps> = ({
                   value={peerUsernameInput}
                   onChange={(e) => setPeerUsernameInput(e.target.value)}
                 />
-                <button className="btn btn-primary" onClick={async () => {
-                  const name = peerUsernameInput.trim();
-                  if (!name) {
-                    alert('Please enter a username.');
-                    return;
-                  }
-                  try {
-                    const resp = await fetch(`/api/users/by-username/${encodeURIComponent(name)}`, {credentials: 'include'});
-                    if (!resp.ok) {
-                      const err = await resp.json();
-                      throw new Error(err.detail || `HTTP ${resp.status}`);
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    const name = peerUsernameInput.trim();
+                    if (!name) {
+                      alert('Please enter a username.');
+                      return;
                     }
-                    const data = await resp.json();
-                    setPeerId(data.user_id);
-                    setPeerUsername(name);
-                  } catch (err: any) {
-                    alert(`Could not find user:\n${err.message}`);
-                  }
-                }}>
+                    try {
+                      const resp = await fetch(
+                        `/api/users/by-username/${encodeURIComponent(name)}`,
+                        { credentials: 'include' }
+                      );
+                      if (!resp.ok) {
+                        const err = await resp.json();
+                        throw new Error(err.detail || `HTTP ${resp.status}`);
+                      }
+                      const data = await resp.json();
+                      setPeerId(data.user_id);
+                      setPeerUsername(name);
+                    } catch (err: any) {
+                      alert(`Could not find user:\n${err.message}`);
+                    }
+                  }}
+                >
                   Start
                 </button>
               </div>
@@ -127,38 +124,20 @@ const MainUI: React.FC<MainUIProps> = ({
                 className="btn btn-secondary mb-2"
                 onClick={() => {
                   setPeerId(null);
+                  setPeerUsername('');
                   setPeerUsernameInput('');
                 }}
               >
                 Change Chat
               </button>
-                  {peerId && (
-                    <ChatWindow
-                      currentUserId={userId}
-                      peerId={peerId}
-                      peerUsername={peerUsername}
-                    />
-                  )}
+              <ChatWindow currentUserId={userId} peerId={peerId} peerUsername={peerUsername} />
             </>
           )}
         </div>
       )}
 
-      {/* 7. Manually change alpha (now persists to backend) */}
-      {selectedOption === 7 && (
-        <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />
-      )}
-
-      {/* 8. Rate a movie */}
-      {selectedOption === 8 && (
-        <RateMovie
-          userId={userId}
-          currentCount={ratingCount}
-          onCountChange={onRatingCountChange}
-        />
-      )}
-
-      {/* 9. Exit/reset message */}
+      {selectedOption === 7 && <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />}
+      {selectedOption === 8 && <RateMovie userId={userId} currentCount={ratingCount} onCountChange={onRatingCountChange} />}
       {selectedOption === 9 && (
         <div className="alert alert-warning text-center">
           All state has been reset. The app will now ask for a new User ID.
@@ -315,6 +294,7 @@ const TalkSpecificMovie: React.FC = () => {
       ]);
     }
   };
+  
 
   return (
     <div className="pane-container">

@@ -41,9 +41,10 @@ const App: React.FC = () => {
 
   // when clicking a friend in the sidebar
   const handleChatWith = (fid: number, fun: string) => {
+    console.log('handleChatWith:', { fid, fun });
     setPeerId(fid);
     setPeerUsername(fun);
-    setSelectedOption(10); // assumes 10 = "Chat with user" pane
+    setSelectedOption(6);
   };
 
   if (userId === null) {
@@ -88,6 +89,10 @@ const App: React.FC = () => {
             setSelectedOption={setSelectedOption}
             ratingCount={ratingCount}
             onRatingCountChange={setRatingCount}
+            peerId={peerId}
+            peerUsername={peerUsername}
+            setPeerId={setPeerId}
+            setPeerUsername={setPeerUsername}
           />
         </div>
 
