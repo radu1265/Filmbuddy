@@ -52,15 +52,16 @@ const ManualAlpha: React.FC<ManualAlphaProps> = ({ userId, alpha, setAlpha }) =>
       <div className="mb-3">
         <label className="form-label">New alpha (0.0 – 1.0):</label>
         <input
-          type="number"
+          type="range"
           step="0.01"
           min={0}
           max={1}
-          className="form-control"
-          value={temp}
+          className="form-range"
+          value={parseFloat(temp)}
           onChange={(e) => setTemp(e.target.value)}
         />
       </div>
+      <div>Value: {parseFloat(temp).toFixed(2)}</div>
       <button
         className="btn btn-primary"
         onClick={handleUpdate}
