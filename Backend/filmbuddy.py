@@ -139,8 +139,9 @@ async def get_top_recommendation(data: Dict[str, Any]):
     Body JSON: { "user_id": int, "alpha": float }
     Returns:
       {
-        "title": "<movie title>",
-        "comment": "<Ollama-generated comment>"
+        "movie_id": int,
+        "title": str,
+        "comment": str
       }
     """
     user_id = data.get("user_id")
@@ -157,11 +158,19 @@ async def get_top_recommendation(data: Dict[str, Any]):
     df = alg.recommend_top_n_movies(user_id, 1, alpha)
     if df.empty:
         raise HTTPException(status_code=404, detail="No recommendation found.")
-    title = df.iloc[0]["title"]
 
+    title = df.iloc[0]["title"]
+    movie_id = df.iloc[0]["movie_id"]
+    print(f"Top recommendation for user {user_id}: {title} (ID: {movie_id})")
+    movie_id = int(movie_id)
     comment = movie_response_str(client, title)
 
-    return {"title": title, "comment": comment}
+    return {
+        "movie_id": movie_id,
+        "title": title,
+        "comment": comment
+    }
+
 
 
 @app.post("/recommend/top_list")
@@ -240,7 +249,7 @@ async def chat_endpoint(data: Dict[str, Any]):
 # ────────────────────────────────────────────────────────────────────────────────
 
 @app.post("/users/register")
-async def register_user(data: Dict[str, Any]):
+async def register_user(data: Dict[str, Any], response: Response):
     """
     POST /users/register
     Body JSON:
@@ -284,6 +293,16 @@ async def register_user(data: Dict[str, Any]):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not create user: {e}")
+    
+    token = create_access_token({"user_id": new_id})
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
 
     return {"user_id": new_id}
 
@@ -877,29 +896,54 @@ async def get_movies():
         ]
     }
 
+@app.get("/movies/unrated")
+async def list_unrated_movies(current_user: int = Depends(get_current_user)):
+    """
+    GET /api/movies/unrated
+    Returns all movies that the current user has not yet rated.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT m.movie_id, m.title
+          FROM movies m
+     LEFT JOIN ratings r
+            ON r.movie_id = m.movie_id
+           AND r.user_id = %s
+         WHERE r.user_id IS NULL
+         ORDER BY m.title
+        """,
+        (current_user,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [{"movie_id": mid, "title": t} for mid, t in rows]
 
 @app.post("/ratings")
-async def rate_movie(data: Dict[str, Any]):
+async def rate_movie(
+    data: Dict[str, Any],
+    current_user: int = Depends(get_current_user),
+):
     """
-    POST /ratings
-    Body JSON: { "user_id": int, "movie_id": int, "rating": int }
-    Returns:
-      { "success": bool }
+    POST /api/ratings
+    Body JSON: { "movie_id": int, "rating": int }
+    Uses session cookie to identify user.
     """
-    user_id = data.get("user_id")
     movie_id = data.get("movie_id")
-    rating = data.get("rating")
+    rating   = data.get("rating")
 
     # Basic validation
-    if not isinstance(user_id, int) or user_id <= 0:
-        raise HTTPException(status_code=400, detail="Invalid user_id.")
     if not isinstance(movie_id, int) or movie_id <= 0:
         raise HTTPException(status_code=400, detail="Invalid movie_id.")
-    if not isinstance(rating, int) or rating < 1 or rating > 5:
+    if not isinstance(rating, int) or not (1 <= rating <= 5):
         raise HTTPException(status_code=400, detail="Rating must be 1–5.")
 
     try:
-        add_or_update_rating(user_id, movie_id, rating)
+        # Reuse your helper, but pass current_user instead of body’s user_id
+        add_or_update_rating(current_user, movie_id, rating)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

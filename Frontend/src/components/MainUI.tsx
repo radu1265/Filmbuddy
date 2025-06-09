@@ -5,6 +5,7 @@ import '../app.css';
 import RateMovie from './RateMovie';
 import ManualAlpha from './ManualAlpha';
 import ChatWindow from './ChatWindow';
+import TopMovie from './TopMovie';
 
 export type MainUIProps = {
   userId: number;
@@ -137,7 +138,7 @@ const MainUI: React.FC<MainUIProps> = ({
       )}
 
       {selectedOption === 7 && <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />}
-      {selectedOption === 8 && <RateMovie userId={userId} currentCount={ratingCount} onCountChange={onRatingCountChange} />}
+      {selectedOption === 8 && <RateMovie currentCount={ratingCount} onCountChange={onRatingCountChange} />}
       {selectedOption === 9 && (
         <div className="alert alert-warning text-center">
           All state has been reset. The app will now ask for a new User ID.
@@ -153,50 +154,7 @@ export default MainUI;
    Sub‐components (same as before, just copied in)
    ———————————————— */
 
-const TopMovie: React.FC<{
-  userId: number;
-  alpha: number;
-}> = ({ userId, alpha }) => {
-  const [result, setResult] = React.useState<{ title: string; comment: string } | null>(null);
-  const [loading, setLoading] = React.useState(false);
 
-  const fetchTop = async () => {
-    setLoading(true);
-    try {
-      const resp = await fetch('/api/recommend/top', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, alpha }),
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json(); // { title, comment }
-      setResult({ title: data.title, comment: data.comment });
-    } catch {
-      setResult({ title: 'Error', comment: 'Could not fetch recommendation.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="pane-container">
-      <h5>1. Get top movie recommendation</h5>
-      <p>
-        <strong>User ID:</strong> {userId} | <strong>Alpha:</strong> {alpha.toFixed(2)}
-      </p>
-      <button className="btn btn-primary mb-3" onClick={fetchTop} disabled={loading}>
-        {loading ? 'Loading…' : 'Get Recommendation'}
-      </button>
-      {result && (
-        <div className="mt-3">
-          <h6>Title: {result.title}</h6>
-          <p>{result.comment}</p>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const TopList: React.FC<{
   userId: number;

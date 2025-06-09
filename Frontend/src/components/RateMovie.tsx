@@ -6,45 +6,40 @@ type Movie = {
 };
 
 type RateMovieProps = {
-  userId: number;
   currentCount: number;
   onCountChange: (newCount: number) => void;
 };
 
-const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChange }) => {
+const RateMovie: React.FC<RateMovieProps> = ({ currentCount, onCountChange }) => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovieId, setSelectedMovieId] = useState<number | ''>('');
   const [rating, setRating] = useState<number | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // 1) Fetch all movies on mount
+  // 1) Fetch unrated movies on mount
   useEffect(() => {
-    const fetchMovies = async () => {
+    (async () => {
       try {
-        const resp = await fetch('/api/movies',{credentials: 'include'});
-        console.log(resp);
-        if (!resp.ok) throw new Error('Failed to load movies');
-        const data = await resp.json(); // expect { movies: [ {movie_id, title}, … ] }
-        setMovies(data.movies);
+        const resp = await fetch('/api/movies/unrated', { credentials: 'include' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data: Movie[] = await resp.json();
+        setMovies(data);
       } catch (err: any) {
         console.error('Error fetching movies:', err);
         setError('Could not load movies. Please try again later.');
       }
-    };
-    fetchMovies();
+    })();
   }, []);
 
-  // 2) Handle the form submission
+  // 2) Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    // Basic validation
     if (
       selectedMovieId === '' ||
-      !Number.isInteger(selectedMovieId) ||
       rating === '' ||
       !Number.isInteger(rating) ||
       rating < 1 ||
@@ -54,29 +49,24 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
       return;
     }
 
-    const payload = {
-      user_id: userId,
-      movie_id: selectedMovieId,
-      rating,
-    };
-
     try {
       const resp = await fetch('/api/ratings', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          movie_id: selectedMovieId,
+          rating,
+        }),
       });
       if (!resp.ok) {
-        let detail = 'Failed to submit rating.';
-        try {
-          const errJson = await resp.json();
-          if (errJson.detail) detail = errJson.detail;
-        } catch {}
-        throw new Error(detail);
+        const errJson = await resp.json().catch(() => null);
+        throw new Error(errJson?.detail || `HTTP ${resp.status}`);
       }
       setSuccess('Rating submitted successfully!');
       onCountChange(currentCount + 1);
+      // remove the just-rated movie from the dropdown
+      setMovies((m) => m.filter((mv) => mv.movie_id !== selectedMovieId));
       setSelectedMovieId('');
       setRating('');
     } catch (err: any) {
@@ -89,23 +79,13 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
     <div className="pane-container">
       <h5>Rate a Movie</h5>
 
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="alert alert-success" role="alert">
-          {success}
-        </div>
-      )}
+      {error && <div className="alert alert-danger">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
 
       <form onSubmit={handleSubmit}>
         {/* Movie selector */}
         <div className="mb-3">
-          <label htmlFor="movie-select" className="form-label">
-            Movie
-          </label>
+          <label htmlFor="movie-select" className="form-label">Movie</label>
           <select
             id="movie-select"
             className="form-select"
@@ -125,9 +105,7 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
 
         {/* Rating selector */}
         <div className="mb-3">
-          <label htmlFor="rating-select" className="form-label">
-            Your Rating
-          </label>
+          <label htmlFor="rating-select" className="form-label">Your Rating</label>
           <select
             id="rating-select"
             className="form-select"
@@ -139,7 +117,7 @@ const RateMovie: React.FC<RateMovieProps> = ({ userId, currentCount, onCountChan
             <option value="">— Choose 1 to 5 —</option>
             {[1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={n}>
-                {n} Star{n > 1 ? 's' : ''}
+                {n} Star{n > 1 && 's'}
               </option>
             ))}
           </select>
