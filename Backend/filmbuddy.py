@@ -1,14 +1,16 @@
 import asyncio
 import traceback
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Response
+from fastapi import FastAPI, HTTPException, Depends, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, validator
+
 
 from ollama import Client
 from server.ollama_server import OllamaServer
-from recommendation import alg  # your existing recommendation.alg module
+from recommendation import alg
 from user_utils import get_db_connection
 import bcrypt
 
@@ -28,6 +30,8 @@ from user_utils import (
 # Globals to hold the Ollama server context and client
 ollama_server: OllamaServer = None
 client: Client = None
+
+
 
 
 def check_user_id(user_id: int) -> bool:
@@ -248,6 +252,23 @@ async def chat_endpoint(data: Dict[str, Any]):
 # New endpoints for user‐management, movie‐listing, and rating
 # ────────────────────────────────────────────────────────────────────────────────
 
+@app.get("/genres", response_model=List[Dict[str, Any]])
+async def list_genres(current_user: int = Depends(get_current_user)):
+    """
+    GET /api/genres
+    Returns a list of all genres: [{"genre_id": int, "name": str}, ...]
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT genre_id, name FROM genres ORDER BY name;")
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    return [{"genre_id": gid, "name": name} for gid, name in rows]
+
 @app.post("/users/register")
 async def register_user(data: Dict[str, Any], response: Response):
     """
@@ -337,7 +358,7 @@ async def login_user(data: Dict[str, Any], response: Response):
     POST /users/login
     Body JSON: { "username": str, "password": str }
     Returns:
-      { "user_id": int, "alpha": float, "success": bool }
+      { "user_id": int, "alpha": float, "is_admin": bool, "success": bool }
     """
     username = data.get("username", "").strip()
     raw_password = data.get("password", "")
@@ -351,7 +372,7 @@ async def login_user(data: Dict[str, Any], response: Response):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT user_id, is_dummy, password_hash, alpha
+        SELECT user_id, is_dummy, password_hash, alpha, is_admin
           FROM users
          WHERE username = %s;
         """,
@@ -364,14 +385,13 @@ async def login_user(data: Dict[str, Any], response: Response):
     if row is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    user_id, is_dummy, stored_hash, stored_alpha = row
+    user_id, is_dummy, stored_hash, stored_alpha, is_admin = row
 
-    # If it’s a dummy account, accept only “admin”
+    # Dummy accounts accept only "admin"
     if is_dummy:
         if raw_password != "admin":
             raise HTTPException(status_code=401, detail="Incorrect password for dummy.")
     else:
-        # Real user — verify stored_hash
         if stored_hash is None:
             raise HTTPException(status_code=500, detail="No password set for this user.")
         if isinstance(stored_hash, memoryview):
@@ -379,18 +399,23 @@ async def login_user(data: Dict[str, Any], response: Response):
         if not bcrypt.checkpw(raw_password.encode("utf-8"), stored_hash):
             raise HTTPException(status_code=401, detail="Incorrect password.")
 
-    # At this point authentication succeeded; issue JWT cookie
-    token = create_access_token({"user_id": user_id})
+    # Issue JWT with both user_id and is_admin
+    token = create_access_token({"user_id": user_id, "is_admin": bool(is_admin)})
     response.set_cookie(
         key="session_token",
         value=token,
         httponly=True,
-        secure=False,       # set True in production (HTTPS)
+        secure=False,       # True in production
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
-    return {"user_id": user_id, "alpha": stored_alpha, "success": True}
+    return {
+        "user_id": user_id,
+        "alpha": stored_alpha,
+        "is_admin": bool(is_admin),
+        "success": True
+    }
 
 @app.post("/users/logout")
 async def logout(response: Response):
@@ -950,3 +975,88 @@ async def rate_movie(
         raise HTTPException(status_code=500, detail=f"Could not save rating: {e}")
 
     return {"success": True}
+
+class MovieWithGenres(BaseModel):
+    title: str
+    release_date: str               # e.g. "01-Jan-2000"
+    genres: List[int]               # array of genre_ids
+
+    @validator("genres", each_item=True)
+    def check_genre_id(cls, v):
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("Each genre ID must be a positive integer")
+        return v
+
+def get_current_admin(
+    user_id: int = Depends(get_current_user)   # <-- only depends on get_current_user
+):
+    """
+    Ensures the logged-in user is an admin.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT is_admin FROM users WHERE user_id = %s;",
+            (user_id,),
+        )
+        row = cur.fetchone()
+    finally:
+        cur.close()
+        conn.close()
+
+    if not row or not row[0]:
+        raise HTTPException(status_code=403, detail="Admin privileges required.")
+
+    return user_id
+
+@app.post("/admin/movies")
+async def add_movie(
+    data: MovieWithGenres,
+    user_id: int = Depends(get_current_admin)
+):
+    print(data)
+    """
+    Admin-only: add a new movie (auto movie_id), then assign its genres.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # 1) Insert into movies
+        cur.execute(
+            """
+            INSERT INTO movies (title, release_date)
+            VALUES (%s, %s)
+            RETURNING movie_id;
+            """,
+            (data.title, data.release_date),
+        )
+        movie_id = cur.fetchone()[0]
+
+        # 2) Insert into movie_genres
+        for gid in data.genres:
+            # verify genre exists
+            cur.execute("SELECT 1 FROM genres WHERE genre_id = %s;", (gid,))
+            if cur.fetchone() is None:
+                raise HTTPException(400, f"Genre {gid} does not exist.")
+            cur.execute(
+                """
+                INSERT INTO movie_genres (movie_id, genre_id)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING;
+                """,
+                (movie_id, gid),
+            )
+
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, detail=f"Could not add movie: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+    return {"success": True, "movie_id": movie_id}

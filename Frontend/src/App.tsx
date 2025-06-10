@@ -4,6 +4,7 @@ import AuthPage from './components/AuthPage';
 import Header from './components/Header';
 import MainUI from './components/MainUI';
 import FriendList from './components/FriendList';
+import AddMovie from './components/AddMovie';
 import ChatNotifications from './components/ChatNotifications';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const [alpha, setAlpha] = useState<number>(0.9);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   // for FriendList → ChatWindow
   const [peerId, setPeerId] = useState<number | null>(null);
@@ -53,6 +55,8 @@ const App: React.FC = () => {
         setUserId={setUserId}
         setUsername={setUsername}
         setAlpha={setAlpha}
+        setIsAdmin={setIsAdmin}
+
         onLoginComplete={(newUserId: number) => {
           fetch(`/api/users/${newUserId}/rating_count`, {
             credentials: 'include',
@@ -74,6 +78,7 @@ const App: React.FC = () => {
         <div className="col-9 d-flex flex-column p-0">
           <Header
             username={username}
+            isAdmin={isAdmin}
             alpha={alpha}
             selectedOption={selectedOption}
             setSelectedOption={setSelectedOption}
@@ -83,6 +88,7 @@ const App: React.FC = () => {
           <ChatNotifications currentUserId={userId} />
           <MainUI
             userId={userId}
+            isAdmin={isAdmin}
             alpha={alpha}
             setAlpha={setAlpha}
             selectedOption={selectedOption}

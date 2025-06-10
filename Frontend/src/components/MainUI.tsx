@@ -6,9 +6,11 @@ import RateMovie from './RateMovie';
 import ManualAlpha from './ManualAlpha';
 import ChatWindow from './ChatWindow';
 import TopMovie from './TopMovie';
+import AddMovie from './AddMovie';
 
 export type MainUIProps = {
   userId: number;
+  isAdmin: boolean;
   alpha: number;
   setAlpha: (a: number) => void;
   selectedOption: number | null;
@@ -25,6 +27,7 @@ export type MainUIProps = {
 
 const MainUI: React.FC<MainUIProps> = ({
   userId,
+  isAdmin,
   alpha,
   setAlpha,
   selectedOption,
@@ -139,6 +142,8 @@ const MainUI: React.FC<MainUIProps> = ({
 
       {selectedOption === 7 && <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />}
       {selectedOption === 8 && <RateMovie currentCount={ratingCount} onCountChange={onRatingCountChange} />}
+      {/* 10. Admin-only “Add Movie” */}
+      {selectedOption === 10 && isAdmin && <AddMovie />}
       {selectedOption === 9 && (
         <div className="alert alert-warning text-center">
           All state has been reset. The app will now ask for a new User ID.

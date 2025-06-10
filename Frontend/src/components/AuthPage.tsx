@@ -6,6 +6,7 @@ type AuthPageProps = {
   setUserId: (id: number) => void;
   setUsername: (name: string) => void;
   setAlpha: (a: number) => void;
+  setIsAdmin: (isAdmin: boolean) => void;
   onLoginComplete: (userId: number) => void;
 };
 
@@ -13,6 +14,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
   setUserId,
   setUsername,
   setAlpha,
+  setIsAdmin,
   onLoginComplete,
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -61,9 +63,11 @@ const AuthPage: React.FC<AuthPageProps> = ({
 
       const data = await resp.json();
       // Expecting { user_id: number, alpha: number, success: true }
+      console.log('Login response:', data);
       if (
         typeof data.user_id !== 'number' ||
-        typeof data.alpha !== 'number'
+        typeof data.alpha !== 'number' ||
+        typeof data.is_admin !== 'boolean'
       ) {
         throw new Error('Invalid response from server.');
       }
@@ -71,6 +75,7 @@ const AuthPage: React.FC<AuthPageProps> = ({
       setUserId(data.user_id);
       setUsername(trimmedUsername);
       setAlpha(data.alpha);
+      setIsAdmin(data.is_admin);
       onLoginComplete(data.user_id);
     } catch (err: any) {
       console.error('Login error:', err);

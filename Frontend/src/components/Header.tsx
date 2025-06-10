@@ -5,6 +5,7 @@ import menuIcon from '../images/menu-button.png';
 
 type HeaderProps = {
   username: string | null;
+  isAdmin: boolean;
   alpha: number;
   selectedOption: number | null;
   setSelectedOption: (opt: number | null) => void;
@@ -14,6 +15,7 @@ type HeaderProps = {
 
 const Header: React.FC<HeaderProps> = ({
   username,
+  isAdmin,
   alpha,
   selectedOption,
   setSelectedOption,
@@ -74,6 +76,16 @@ const Header: React.FC<HeaderProps> = ({
                 </button>
               </li>
             ))}
+            {isAdmin && (
+              <li>
+                <button
+                  className="dropdown-item"
+                  onClick={() => handleSelect(10)}
+                >
+                  10. Add movie
+                </button>
+              </li>
+            )}
 
             <li>
               <hr className="dropdown-divider" />

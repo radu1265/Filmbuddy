@@ -152,4 +152,3 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="User not found")
     # you can fetch and return a full user object here if needed
     return user_id
-
