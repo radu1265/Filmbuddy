@@ -42,7 +42,7 @@ const MainUI: React.FC<MainUIProps> = ({
   const requireFiveRatings = (): boolean => {
     if (ratingCount < 5) {
       alert(`You must rate at least 5 movies first.\n(You've rated ${ratingCount}.)`);
-      setSelectedOption(8);
+      setSelectedOption(7);
       return true;
     }
     return false;
@@ -74,11 +74,11 @@ const MainUI: React.FC<MainUIProps> = ({
       {selectedOption === 2 && !requireFiveRatings() && <TopList userId={userId} alpha={alpha} />}
       {selectedOption === 3 && <TalkSpecificMovie />}
       {selectedOption === 4 && <AdjustEmotion userId={userId} alpha={alpha} setAlpha={setAlpha} />}
-      {selectedOption === 5 && <Chatbot />}
+      {/* {selectedOption === 5 && <Chatbot />} */}
 
-      {selectedOption === 6 && (
+      {selectedOption === 5 && (
         <div className="pane-container">
-          <h5>6. {peerId ? `Chat with ${peerUsername}` : 'Chat with a user'}</h5>
+          <h5>5. {peerId ? `Chat with ${peerUsername}` : 'Chat with a user'}</h5>
 
           {!peerId ? (
             <>
@@ -140,11 +140,11 @@ const MainUI: React.FC<MainUIProps> = ({
         </div>
       )}
 
-      {selectedOption === 7 && <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />}
-      {selectedOption === 8 && <RateMovie currentCount={ratingCount} onCountChange={onRatingCountChange} />}
+      {selectedOption === 6 && <ManualAlpha userId={userId} alpha={alpha} setAlpha={setAlpha} />}
+      {selectedOption === 7 && <RateMovie currentCount={ratingCount} onCountChange={onRatingCountChange} />}
       {/* 10. Admin-only “Add Movie” */}
-      {selectedOption === 10 && isAdmin && <AddMovie />}
-      {selectedOption === 9 && (
+      {selectedOption === 9 && isAdmin && <AddMovie />}
+      {selectedOption === 8 && (
         <div className="alert alert-warning text-center">
           All state has been reset. The app will now ask for a new User ID.
         </div>

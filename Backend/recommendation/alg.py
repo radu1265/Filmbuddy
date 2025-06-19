@@ -119,7 +119,6 @@ def apply_svd_and_genre(test_size=0.2, random_state=42):
     # Identify which columns in movies_df are genre columns:
     # (anything except "movie_id" and "title" are genre flags)
     genre_cols = [col for col in movies_df.columns if col not in ["movie_id", "title"]]
-    # Convert those columns to a NumPy matrix (dtype=int)
     genre_matrix = movies_df[genre_cols].values.astype(int)
 
     # Compute cosine similarity (movies × movies)

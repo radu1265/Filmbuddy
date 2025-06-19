@@ -65,8 +65,8 @@ const Header: React.FC<HeaderProps> = ({
         </button>
         {dropdownOpen && (
           <ul className="dropdown-menu dropdown-menu-end show">
-            {/* Options 1–8 */}
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((opt) => (
+            {/* Options 1–7 */}
+            {[1, 2, 3, 4, 5, 6, 7].map((opt) => (
               <li key={opt}>
                 <button
                   className="dropdown-item"
@@ -82,7 +82,7 @@ const Header: React.FC<HeaderProps> = ({
                   className="dropdown-item"
                   onClick={() => handleSelect(10)}
                 >
-                  10. Add movie
+                  9. Add movie
                 </button>
               </li>
             )}
@@ -91,13 +91,13 @@ const Header: React.FC<HeaderProps> = ({
               <hr className="dropdown-divider" />
             </li>
 
-            {/* Option 9: Exit */}
+            {/* Option 8: Exit */}
             <li>
               <button
                 className="dropdown-item text-danger"
                 onClick={() => handleSelect(9)}
               >
-                9. Exit
+                8. Exit
               </button>
             </li>
           </ul>
@@ -133,12 +133,10 @@ function optionText(opt: number): string {
     case 4:
       return 'Personalize (adjust alpha)';
     case 5:
-      return 'Chat with assistant';
-    case 6:
       return 'Chat with user';
-    case 7:
+    case 6:
       return 'Manually change alpha';
-    case 8:
+    case 7:
       return 'Rate a movie';
     default:
       return '';

@@ -4,7 +4,6 @@ import AuthPage from './components/AuthPage';
 import Header from './components/Header';
 import MainUI from './components/MainUI';
 import FriendList from './components/FriendList';
-import AddMovie from './components/AddMovie';
 import ChatNotifications from './components/ChatNotifications';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';

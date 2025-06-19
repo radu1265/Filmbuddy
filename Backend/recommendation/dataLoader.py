@@ -44,3 +44,10 @@ def data_for_surprise():
     reader = Reader(rating_scale=(1, 5))
     data = Dataset.load_from_df(df, reader)
     return data
+
+def clean_data(df):
+    # Remove rows with NaN values
+    df = df.dropna()
+    df.drop_duplicates(inplace=True)
+
+    return df
